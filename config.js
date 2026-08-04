@@ -1,0 +1,62 @@
+/* ==========================================================================
+   CONFIGURACIÓN — white-label
+   Todo lo personalizable por cliente vive aquí. Para adaptar la app a una
+   marca basta con cambiar los valores de este archivo: nombre, color de
+   acento, vista inicial del mapa, proveedor de teselas, buscador y las
+   categorías de puntos. No hace falta tocar el resto del código.
+   ========================================================================== */
+window.APP_CONFIG = {
+  /* Identidad -------------------------------------------------------------- */
+  name: "Rastro",                   // se muestra en la barra superior y el título
+  shortName: "Rastro",              // versión corta (móvil / pestaña)
+  tagline: "Tus sitios, tus notas", // subtítulo opcional (vacío para ocultarlo)
+
+  /* Color de acento (botones, estrellas, estados activos) ------------------ */
+  accent: "#EA7317",
+
+  /* Clave de almacenamiento local (cámbiala para aislar datos por cliente) - */
+  storageKey: "rastro:puntos:v1",
+
+  /* Mapa ------------------------------------------------------------------- */
+  map: {
+    center: [40.0, -3.7],           // vista inicial [lat, lng]
+    zoom: 6,
+    tryGeolocateOnLoad: true,       // intentar centrar en la ubicación del usuario
+    tiles: {
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    },
+    /* Buscador de lugares (geocodificación). enabled:false lo oculta.
+       Nominatim es gratuito pero con límite de uso; para producción con
+       volumen, apunta endpoint a tu propio servicio de geocodificación. */
+    geocode: {
+      enabled: true,
+      endpoint: "https://nominatim.openstreetmap.org/search",
+      countrycodes: "es",           // limita resultados a un país; "" = global
+      language: "es"
+    }
+  },
+
+  /* Estados de un punto ---------------------------------------------------- */
+  statuses: [
+    { id: "visitado",  label: "Visitado"  },
+    { id: "pendiente", label: "Pendiente" }
+  ],
+
+  /* Categorías (id, etiqueta, emoji, color del marcador) ------------------- */
+  categories: [
+    { id: "restaurante", label: "Restaurante", emoji: "🍽️", color: "#C1440E" },
+    { id: "bar",         label: "Bar / Café",  emoji: "☕",  color: "#8D6E63" },
+    { id: "mirador",     label: "Mirador",     emoji: "🌄", color: "#2E7D32" },
+    { id: "faro",        label: "Faro",        emoji: "🗼", color: "#1565C0" },
+    { id: "playa",       label: "Playa",       emoji: "🏖️", color: "#00ACC1" },
+    { id: "acampada",    label: "Acampada",    emoji: "⛺", color: "#33691E" },
+    { id: "ruta",        label: "Ruta",        emoji: "🥾", color: "#F9A825" },
+    { id: "pueblo",      label: "Pueblo",      emoji: "🏘️", color: "#8E24AA" },
+    { id: "alojamiento", label: "Alojamiento", emoji: "🛏️", color: "#5E35B1" },
+    { id: "monumento",   label: "Monumento",   emoji: "🏛️", color: "#546E7A" },
+    { id: "naturaleza",  label: "Naturaleza",  emoji: "🌲", color: "#1B5E20" },
+    { id: "otro",        label: "Otro",        emoji: "📍", color: "#616161" }
+  ]
+};
