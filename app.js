@@ -573,32 +573,103 @@
   }
 
   // --- Buscador de lugares (geocodificación) ------------------------------
-  var geoTimer, geoActiveIndex = -1, geoItems = [];
-  function geosearch(q) {
+  // Nominatim limita a ~1 consulta por segundo: si se le lanzan varias
+  // seguidas responde con error. Por eso se espera entre pulsaciones, se
+  // distingue "sin resultados" de "servicio no disponible" y hay un
+  // proveedor de respaldo (Photon) cuando el principal falla o no encuentra.
+  var geoTimer, geoActiveIndex = -1, geoItems = [], geoSeq = 0, geoLastQuery = "";
+
+  function fetchNominatim(q, restrictCountry) {
     var g = CFG.map.geocode;
-    var url = g.endpoint + "?format=json&limit=6&addressdetails=0" +
-      (g.countrycodes ? "&countrycodes=" + encodeURIComponent(g.countrycodes) : "") +
+    var url = g.endpoint + "?format=jsonv2&limit=8&addressdetails=0" +
+      (restrictCountry && g.countrycodes ? "&countrycodes=" + encodeURIComponent(g.countrycodes) : "") +
       (g.language ? "&accept-language=" + encodeURIComponent(g.language) : "") +
       "&q=" + encodeURIComponent(q);
-    fetch(url, { headers: { "Accept": "application/json" } })
-      .then(function (r) { return r.json(); })
-      .then(function (data) { showGeoResults(data || []); })
-      .catch(function () { showGeoResults([]); });
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("nominatim " + r.status);
+      return r.json();
+    }).then(function (list) {
+      return (list || []).map(function (x) {
+        return { lat: parseFloat(x.lat), lon: parseFloat(x.lon), label: x.display_name };
+      });
+    });
   }
+
+  function fetchPhoton(q) {
+    var g = CFG.map.geocode;
+    var base = g.fallbackEndpoint || "https://photon.komoot.io/api/";
+    var url = base + "?limit=8&q=" + encodeURIComponent(q);
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("photon " + r.status);
+      return r.json();
+    }).then(function (data) {
+      var feats = (data && data.features) || [];
+      var cc = (g.countrycodes || "").toUpperCase();
+      return feats.filter(function (f) {
+        if (!f.geometry || !f.geometry.coordinates) return false;
+        if (!cc) return true;
+        var c = (f.properties && f.properties.countrycode) || "";
+        return c.toUpperCase() === cc;
+      }).map(function (f) {
+        var p = f.properties || {};
+        var parts = [p.name, p.city || p.county, p.state, p.country].filter(Boolean);
+        return {
+          lat: f.geometry.coordinates[1],
+          lon: f.geometry.coordinates[0],
+          label: parts.join(", ")
+        };
+      });
+    });
+  }
+
+  function geosearch(q) {
+    var seq = ++geoSeq;
+    geoLastQuery = q;
+    geoMessage("Buscando…");
+    fetchNominatim(q, true)
+      .then(function (list) {
+        if (list.length) return list;
+        return fetchPhoton(q); // no encontró: probamos el de respaldo
+      })
+      .catch(function () {
+        return fetchPhoton(q); // falló (p. ej. límite de uso): respaldo
+      })
+      .then(function (list) {
+        if (seq !== geoSeq) return; // respuesta antigua
+        showGeoResults(list || []);
+      })
+      .catch(function () {
+        if (seq !== geoSeq) return;
+        geoMessage("No se pudo buscar ahora. Inténtalo en unos segundos.");
+      });
+  }
+
+  function geoMessage(msg) {
+    var ul = $("#geosearch-results");
+    ul.innerHTML = "";
+    geoItems = []; geoActiveIndex = -1;
+    ul.appendChild(el("li", "empty", msg));
+    ul.hidden = false;
+  }
+
   function showGeoResults(list) {
     var ul = $("#geosearch-results"); ul.innerHTML = "";
     geoItems = list; geoActiveIndex = -1;
-    if (!list.length) { ul.appendChild(el("li", "empty", "Sin resultados")); ul.hidden = false; return; }
+    if (!list.length) {
+      ul.appendChild(el("li", "empty", "Sin resultados para “" + geoLastQuery + "”"));
+      ul.hidden = false; return;
+    }
     list.forEach(function (item, i) {
-      var li = el("li", null, item.display_name);
+      var li = el("li", null, item.label);
       li.addEventListener("click", function () { pickGeo(i); });
       ul.appendChild(li);
     });
     ul.hidden = false;
   }
+
   function pickGeo(i) {
     var item = geoItems[i]; if (!item) return;
-    map.setView([parseFloat(item.lat), parseFloat(item.lon)], 15, { animate: true });
+    map.setView([item.lat, item.lon], 15, { animate: true });
     $("#geosearch-results").hidden = true; $("#geosearch-input").value = "";
     if (viewMode === "all") scheduleDiscover();
     else toast("¿Buen sitio? Pulsa “Añadir” para guardarlo.");
@@ -663,15 +734,26 @@
         var q = this.value.trim();
         clearTimeout(geoTimer);
         if (q.length < 3) { $("#geosearch-results").hidden = true; return; }
-        geoTimer = setTimeout(function () { geosearch(q); }, 350);
+        // 700 ms: respeta el límite de ~1 consulta/segundo del geocodificador.
+        geoTimer = setTimeout(function () { geosearch(q); }, 700);
       });
       input.addEventListener("keydown", function (e) {
         var ul = $("#geosearch-results");
+        // Enter fuerza la búsqueda ya, sin esperar, y elige si ya hay resultados.
+        if (e.key === "Enter") {
+          e.preventDefault();
+          clearTimeout(geoTimer);
+          if (geoItems.length) { pickGeo(geoActiveIndex >= 0 ? geoActiveIndex : 0); }
+          else {
+            var q = this.value.trim();
+            if (q.length >= 2) geosearch(q);
+          }
+          return;
+        }
         if (ul.hidden) return;
         var items = ul.querySelectorAll("li:not(.empty)");
         if (e.key === "ArrowDown") { e.preventDefault(); geoActiveIndex = Math.min(geoActiveIndex + 1, items.length - 1); }
         else if (e.key === "ArrowUp") { e.preventDefault(); geoActiveIndex = Math.max(geoActiveIndex - 1, 0); }
-        else if (e.key === "Enter") { e.preventDefault(); pickGeo(geoActiveIndex >= 0 ? geoActiveIndex : 0); return; }
         else { return; }
         items.forEach(function (li, i) { li.classList.toggle("active", i === geoActiveIndex); });
       });

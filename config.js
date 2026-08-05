@@ -45,6 +45,9 @@ window.APP_CONFIG = {
     geocode: {
       enabled: true,
       endpoint: "https://nominatim.openstreetmap.org/search",
+      // Buscador de respaldo: se usa si el principal falla (su límite es de
+      // ~1 consulta/segundo) o si no encuentra nada.
+      fallbackEndpoint: "https://photon.komoot.io/api/",
       countrycodes: "es",           // limita resultados a un país; "" = global
       language: "es"
     }
