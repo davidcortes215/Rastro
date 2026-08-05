@@ -1,8 +1,10 @@
 /* ==========================================================================
-   Mapa de Lugares — lógica de la aplicación
-   Registra, valora, clasifica y filtra puntos de interés sobre un mapa.
-   Persistencia a través de window.Store (ver js/store.js). Configuración y
-   marca en js/config.js. Mapa con Leaflet + teselas configurables.
+   Rastro — lógica de la aplicación
+   Dos modos de vista:
+     · "mine" → tus puntos guardados (persisten en Store, ver store.js).
+     · "all"  → sitios de OpenStreetMap en la zona visible (Overpass API),
+                que puedes guardar en los tuyos con un clic.
+   Configuración y marca en config.js. Mapa con Leaflet.
    ========================================================================== */
 (function () {
   "use strict";
@@ -13,9 +15,12 @@
   CATEGORIES.forEach(function (c) { CAT_BY_ID[c.id] = c; });
   function cat(id) { return CAT_BY_ID[id] || CAT_BY_ID.otro || CATEGORIES[CATEGORIES.length - 1]; }
   var DEFAULT_STATUS = (CFG.statuses[0] && CFG.statuses[0].id) || "visitado";
+  var DISCOVER = CFG.discover || { enabled: false };
 
-  // --- Estado (caché en memoria; la fuente de verdad es Store) ------------
-  var points = [];
+  // --- Estado -------------------------------------------------------------
+  var points = [];          // tus puntos (owned), fuente de verdad: Store
+  var discovered = [];       // sitios de OSM en la zona (transitorios)
+  var viewMode = "mine";     // "mine" | "all"
   var map, markersLayer, markerById = {};
   var addMode = false;
   var editingId = null;
@@ -34,13 +39,8 @@
     if (text != null) n.textContent = text;
     return n;
   }
-  function uid() {
-    return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  }
-  function starsText(n) {
-    n = n || 0;
-    return "★★★★★".slice(0, n) + "☆☆☆☆☆".slice(0, 5 - n);
-  }
+  function uid() { return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function starsText(n) { n = n || 0; return "★★★★★".slice(0, n) + "☆☆☆☆☆".slice(0, 5 - n); }
   function escapeHtml(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -53,28 +53,22 @@
   var toastTimer;
   function toast(msg) {
     var t = $("#toast");
-    t.textContent = msg;
-    t.hidden = false;
+    t.textContent = msg; t.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.hidden = true; }, 2600);
   }
 
-  // --- Aplicar configuración / marca --------------------------------------
+  // --- Configuración / marca ----------------------------------------------
   function applyConfig() {
     document.documentElement.style.setProperty("--accent", CFG.accent || "#EA7317");
     document.title = CFG.name;
     $("#brand-name").textContent = CFG.name;
-    var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", "#141414");
-    if (!CFG.map.geocode || !CFG.map.geocode.enabled) {
-      $("#geosearch").hidden = true;
-    } else {
-      $("#geosearch-input").placeholder = "Buscar un lugar para ir…";
-    }
+    if (!CFG.map.geocode || !CFG.map.geocode.enabled) $("#geosearch").hidden = true;
+    if (!DISCOVER.enabled) $("#mode-toggle").hidden = true;
   }
 
-  // --- Icono del marcador -------------------------------------------------
-  function makeIcon(p) {
+  // --- Iconos -------------------------------------------------------------
+  function makeIcon(p) { // pin (tus puntos)
     var c = cat(p.cat);
     var pending = p.status === "pendiente" ? " is-pending" : "";
     return L.divIcon({
@@ -82,6 +76,14 @@
       html: '<div class="poi-pin' + pending + '" style="background:' + c.color + '">' +
             '<span>' + c.emoji + "</span></div>",
       iconSize: [30, 30], iconAnchor: [15, 28], popupAnchor: [0, -26]
+    });
+  }
+  function makeDot(p) { // círculo (sitios descubiertos)
+    var c = cat(p.cat);
+    return L.divIcon({
+      className: "",
+      html: '<div class="poi-dot" style="background:' + c.color + '"><span>' + c.emoji + "</span></div>",
+      iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -12]
     });
   }
 
@@ -96,11 +98,9 @@
     markersLayer = L.layerGroup().addTo(map);
 
     map.on("click", function (e) {
-      if (addMode) {
-        openEditor(null, e.latlng.lat, e.latlng.lng);
-        setAddMode(false);
-      }
+      if (addMode) { openEditor(null, e.latlng.lat, e.latlng.lng); setAddMode(false); }
     });
+    map.on("moveend", function () { if (viewMode === "all") scheduleDiscover(); });
 
     if (m.tryGeolocateOnLoad && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function (pos) {
@@ -109,12 +109,43 @@
     }
   }
 
+  // --- Conjunto activo ----------------------------------------------------
+  function activeSet() { return viewMode === "mine" ? points : discovered; }
+  function itemById(id) {
+    var set = activeSet();
+    for (var i = 0; i < set.length; i++) if (set[i].id === id) return set[i];
+    return null;
+  }
+
+  function filteredItems() {
+    var txt = filters.text.trim().toLowerCase();
+    var all = viewMode === "all";
+    return activeSet().filter(function (p) {
+      if (!filters.cats[p.cat]) return false;
+      if (!all) { // los filtros de valoración/estado solo aplican a tus puntos
+        if (filters.rating > 0 && (p.stars || 0) < filters.rating) return false;
+        if (filters.status !== "todos" && p.status !== filters.status) return false;
+      }
+      if (txt) {
+        var hay = (p.name + " " + (p.notes || "") + " " + cat(p.cat).label).toLowerCase();
+        if (hay.indexOf(txt) === -1) return false;
+      }
+      return true;
+    });
+  }
+  function filtersActive() {
+    if (filters.text) return true;
+    if (viewMode === "mine" && (filters.rating > 0 || filters.status !== "todos")) return true;
+    return CATEGORIES.some(function (c) { return !filters.cats[c.id]; });
+  }
+
   // --- Marcadores ---------------------------------------------------------
   function renderMarkers() {
     markersLayer.clearLayers();
     markerById = {};
-    filteredPoints().forEach(function (p) {
-      var mk = L.marker([p.lat, p.lng], { icon: makeIcon(p), title: p.name });
+    var mine = viewMode === "mine";
+    filteredItems().forEach(function (p) {
+      var mk = L.marker([p.lat, p.lng], { icon: mine ? makeIcon(p) : makeDot(p), title: p.name });
       mk.bindPopup(popupHtml(p), { closeButton: true });
       mk.on("popupopen", function () { wirePopup(p.id); highlightCard(p.id); });
       mk.addTo(markersLayer);
@@ -123,9 +154,17 @@
   }
   function popupHtml(p) {
     var c = cat(p.cat);
+    if (p.osm) {
+      return '<div class="popup" data-id="' + p.id + '">' +
+        '<div class="popup-name">' + escapeHtml(p.name) + "</div>" +
+        '<div class="popup-meta">' + escapeHtml(c.label) + " · OpenStreetMap</div>" +
+        '<div class="popup-actions">' +
+          '<button type="button" data-act="save">＋ Guardar en mis puntos</button>' +
+        "</div></div>";
+    }
     var meta = c.label + (p.status === "pendiente" ? " · " + statusLabel("pendiente").toLowerCase() : "");
-    var stars = (p.status === "pendiente" && !p.stars)
-      ? "" : '<span class="popup-stars">' + starsText(p.stars) + "</span> ";
+    var stars = (p.status === "pendiente" && !p.stars) ? "" :
+      '<span class="popup-stars">' + starsText(p.stars) + "</span> ";
     var notes = p.notes ? '<div class="popup-notes">' + escapeHtml(p.notes) + "</div>" : "";
     return '<div class="popup" data-id="' + p.id + '">' +
       '<div class="popup-name">' + escapeHtml(p.name) + "</div>" +
@@ -139,55 +178,46 @@
   function wirePopup(id) {
     var node = document.querySelector('.popup[data-id="' + id + '"]');
     if (!node) return;
+    var p = itemById(id);
+    if (!p) return;
+    if (p.osm) {
+      node.querySelector('[data-act="save"]').onclick = function () {
+        map.closePopup();
+        openEditor(null, p.lat, p.lng, { name: p.name, cat: p.cat });
+      };
+      return;
+    }
     node.querySelector('[data-act="edit"]').onclick = function () {
-      map.closePopup();
-      var p = pointById(id);
-      if (p) openEditor(p.id, p.lat, p.lng);
+      map.closePopup(); openEditor(p.id, p.lat, p.lng);
     };
     node.querySelector('[data-act="delete"]').onclick = function () {
       if (confirm("¿Eliminar este punto?")) deletePoint(id);
     };
   }
 
-  // --- Filtro -------------------------------------------------------------
-  function filteredPoints() {
-    var txt = filters.text.trim().toLowerCase();
-    return points.filter(function (p) {
-      if (!filters.cats[p.cat]) return false;
-      if (filters.rating > 0 && (p.stars || 0) < filters.rating) return false;
-      if (filters.status !== "todos" && p.status !== filters.status) return false;
-      if (txt) {
-        var hay = (p.name + " " + (p.notes || "") + " " + cat(p.cat).label).toLowerCase();
-        if (hay.indexOf(txt) === -1) return false;
-      }
-      return true;
-    });
-  }
-  function filtersActive() {
-    if (filters.text || filters.rating > 0 || filters.status !== "todos") return true;
-    return CATEGORIES.some(function (c) { return !filters.cats[c.id]; });
-  }
-
   // --- Lista --------------------------------------------------------------
   function renderList() {
     var ul = $("#poi-list");
     ul.innerHTML = "";
-    var visible = filteredPoints().sort(function (a, b) {
+    var visible = filteredItems().slice().sort(function (a, b) {
       return (b.stars || 0) - (a.stars || 0) || a.name.localeCompare(b.name);
     });
     $("#count-visible").textContent = visible.length;
-    $("#count-total").textContent = points.length;
+    $("#count-total").textContent = activeSet().length;
     $("#btn-reset-filters").hidden = !filtersActive();
 
-    if (points.length === 0) {
-      ul.appendChild(emptyState("Aún no tienes puntos.",
-        "Pulsa “Añadir” y toca el mapa para guardar tu primer sitio."));
+    if (activeSet().length === 0) {
+      if (viewMode === "mine") {
+        ul.appendChild(emptyState("Aún no tienes puntos.",
+          "Pulsa “Añadir” y toca el mapa, o usa el modo “Todos” para descubrir sitios."));
+      } else {
+        ul.appendChild(emptyState("Sin sitios en esta zona.",
+          "Acércate o mueve el mapa para buscar en otra zona."));
+      }
       return;
     }
-    if (visible.length === 0) {
-      ul.appendChild(emptyState("Ningún punto coincide con los filtros.", ""));
-      return;
-    }
+    if (visible.length === 0) { ul.appendChild(emptyState("Nada coincide con los filtros.", "")); return; }
+
     visible.forEach(function (p) {
       var c = cat(p.cat);
       var li = el("li", "poi-card"); li.dataset.id = p.id;
@@ -197,15 +227,18 @@
       top.appendChild(el("span", "poi-card-name", p.name));
       li.appendChild(top);
       var meta = el("div", "poi-card-meta");
-      if (p.status === "pendiente" && !p.stars) {
+      if (p.osm) {
+        meta.appendChild(el("span", "poi-card-cat", c.label));
+      } else if (p.status === "pendiente" && !p.stars) {
         meta.appendChild(el("span", "poi-card-pend", statusLabel("pendiente")));
+        meta.appendChild(el("span", "poi-card-cat", c.label));
       } else {
         meta.appendChild(el("span", "poi-card-stars", starsText(p.stars)));
+        meta.appendChild(el("span", "poi-card-cat", c.label));
       }
-      meta.appendChild(el("span", "poi-card-cat", c.label));
       li.appendChild(meta);
       if (p.notes) li.appendChild(el("div", "poi-card-notes", p.notes));
-      li.addEventListener("click", function () { focusPoint(p.id); });
+      li.addEventListener("click", function () { focusItem(p.id); });
       ul.appendChild(li);
     });
   }
@@ -220,17 +253,15 @@
       c.classList.toggle("is-active", c.dataset.id === id);
     });
   }
-  function focusPoint(id) {
-    var p = pointById(id);
-    if (!p) return;
-    map.setView([p.lat, p.lng], Math.max(map.getZoom(), 14), { animate: true });
-    var mk = markerById[id];
-    if (mk) mk.openPopup();
+  function focusItem(id) {
+    var p = itemById(id); if (!p) return;
+    map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15), { animate: true });
+    var mk = markerById[id]; if (mk) mk.openPopup();
     highlightCard(id);
     if (window.innerWidth <= 720) setPanelHidden(true);
   }
 
-  // --- CRUD (async vía Store) ---------------------------------------------
+  // --- CRUD (tus puntos) --------------------------------------------------
   function pointById(id) {
     for (var i = 0; i < points.length; i++) if (points[i].id === id) return points[i];
     return null;
@@ -238,27 +269,23 @@
   function deletePoint(id) {
     Store.remove(id).then(function () {
       points = points.filter(function (p) { return p.id !== id; });
-      renderMarkers(); renderList();
-      toast("Punto eliminado.");
+      refresh(); toast("Punto eliminado.");
     }).catch(function () { toast("No se pudo eliminar."); });
   }
 
   // --- Editor -------------------------------------------------------------
   function buildStarInput() {
     var box = $("#poi-stars"); box.innerHTML = "";
-    for (var i = 1; i <= 5; i++) {
-      (function (val) {
-        var b = el("button", "star", "★");
-        b.type = "button"; b.setAttribute("role", "radio");
-        b.setAttribute("aria-label", val + " estrella" + (val > 1 ? "s" : ""));
-        b.addEventListener("click", function () { setStars(val); });
-        box.appendChild(b);
-      })(i);
-    }
+    for (var i = 1; i <= 5; i++) (function (val) {
+      var b = el("button", "star", "★");
+      b.type = "button"; b.setAttribute("role", "radio");
+      b.setAttribute("aria-label", val + " estrella" + (val > 1 ? "s" : ""));
+      b.addEventListener("click", function () { setStars(val); });
+      box.appendChild(b);
+    })(i);
   }
   function setStars(n) {
-    draftStars = (draftStars === n) ? n - 1 : n;
-    if (draftStars < 0) draftStars = 0;
+    draftStars = (draftStars === n) ? n - 1 : n; if (draftStars < 0) draftStars = 0;
     var kids = $("#poi-stars").children;
     for (var i = 0; i < kids.length; i++) {
       kids[i].classList.toggle("is-on", i < draftStars);
@@ -280,13 +307,12 @@
       t.setAttribute("aria-checked", t.dataset.status === s ? "true" : "false");
     });
   }
-
-  function openEditor(id, lat, lng) {
+  function openEditor(id, lat, lng, prefill) {
     editingId = id;
     var p = id ? pointById(id) : null;
     $("#editor-title").textContent = p ? "Editar punto" : "Nuevo punto";
-    $("#poi-name").value = p ? p.name : "";
-    $("#poi-cat").value = p ? p.cat : CATEGORIES[0].id;
+    $("#poi-name").value = p ? p.name : (prefill && prefill.name ? prefill.name : "");
+    $("#poi-cat").value = p ? p.cat : (prefill && prefill.cat ? prefill.cat : CATEGORIES[0].id);
     $("#poi-notes").value = p ? (p.notes || "") : "";
     draftStars = 0; setStars(0);
     if (p) setStars(p.stars || 0);
@@ -299,8 +325,7 @@
     setTimeout(function () { $("#poi-name").focus(); }, 30);
   }
   function closeEditor() {
-    $("#editor").hidden = true;
-    $("#editor-backdrop").hidden = true;
+    $("#editor").hidden = true; $("#editor-backdrop").hidden = true;
     editingId = null; draft = null;
   }
   function submitEditor(e) {
@@ -308,25 +333,22 @@
     var name = $("#poi-name").value.trim();
     if (!name) { $("#poi-name").focus(); return; }
     var data = {
-      name: name,
-      cat: $("#poi-cat").value,
-      stars: draftStars,
-      status: draftStatus,
-      notes: $("#poi-notes").value.trim()
+      name: name, cat: $("#poi-cat").value, stars: draftStars,
+      status: draftStatus, notes: $("#poi-notes").value.trim()
     };
     if (editingId) {
       var id = editingId;
       Store.update(id, data).then(function () {
         var p = pointById(id); if (p) Object.assign(p, data);
-        renderMarkers(); renderList(); closeEditor();
-        toast("Punto actualizado.");
+        refresh(); closeEditor(); toast("Punto actualizado.");
       }).catch(function () { toast("No se pudo guardar."); });
     } else {
       var np = Object.assign({ id: uid(), lat: draft.lat, lng: draft.lng, created: Date.now() }, data);
       Store.create(np).then(function () {
         points.push(np);
-        renderMarkers(); renderList(); closeEditor();
-        toast("Punto guardado.");
+        closeEditor();
+        toast(viewMode === "all" ? "Guardado en tus puntos." : "Punto guardado.");
+        refresh();
       }).catch(function () { toast("No se pudo guardar."); });
     }
   }
@@ -345,8 +367,116 @@
     $("#panel").classList.toggle("is-hidden", hidden);
     setTimeout(function () { map.invalidateSize(); }, 260);
   }
-  function togglePanel() {
-    setPanelHidden(!$("#panel").classList.contains("is-hidden"));
+  function togglePanel() { setPanelHidden(!$("#panel").classList.contains("is-hidden")); }
+
+  // --- Modo de vista (Mis PDI / Todos) ------------------------------------
+  function setViewMode(mode) {
+    if (mode === viewMode) return;
+    viewMode = mode;
+    document.querySelector(".app").classList.toggle("mode-all", mode === "all");
+    document.querySelectorAll("#mode-toggle .mode-btn").forEach(function (b) {
+      var on = b.dataset.mode === mode;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    $("#filter-text").placeholder = mode === "all" ? "Buscar en la zona…" : "Nombre, nota, lugar…";
+    $("#filter-text-label").textContent = mode === "all" ? "Buscar en la zona" : "Buscar en mis puntos";
+    if (mode === "all") { refresh(); scheduleDiscover(); }
+    else { setDiscoverStatus(""); refresh(); }
+  }
+
+  // --- Descubrir (Overpass) -----------------------------------------------
+  var discoverTimer, discoverSeq = 0;
+  function setDiscoverStatus(msg) {
+    var d = $("#discover-status");
+    if (!msg) { d.hidden = true; d.textContent = ""; return; }
+    d.textContent = msg; d.hidden = false;
+  }
+  function scheduleDiscover() {
+    clearTimeout(discoverTimer);
+    discoverTimer = setTimeout(runDiscover, 450);
+  }
+  function selectedOsmSelectors() {
+    var out = [];
+    CATEGORIES.forEach(function (c) {
+      if (!filters.cats[c.id]) return;
+      var sels = DISCOVER.osm[c.id];
+      if (sels) out = out.concat(sels);
+    });
+    return out;
+  }
+  function runDiscover() {
+    if (viewMode !== "all" || !DISCOVER.enabled) return;
+    if (map.getZoom() < (DISCOVER.minZoom || 12)) {
+      discovered = []; renderMarkers(); renderList();
+      setDiscoverStatus("Acércate para ver los sitios de la zona.");
+      return;
+    }
+    var selectors = selectedOsmSelectors();
+    if (!selectors.length) {
+      discovered = []; renderMarkers(); renderList();
+      setDiscoverStatus("Selecciona alguna categoría para buscar.");
+      return;
+    }
+    var b = map.getBounds();
+    var bbox = b.getSouth().toFixed(5) + "," + b.getWest().toFixed(5) + "," +
+               b.getNorth().toFixed(5) + "," + b.getEast().toFixed(5);
+    var body = "[out:json][timeout:25];(";
+    selectors.forEach(function (sel) { body += "nwr" + sel + "(" + bbox + ");"; });
+    body += ");out center " + (DISCOVER.maxResults || 250) + ";";
+
+    var seq = ++discoverSeq;
+    setDiscoverStatus("Buscando sitios…");
+    fetch(DISCOVER.overpassEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: body
+    }).then(function (r) {
+      if (!r.ok) throw new Error("overpass " + r.status);
+      return r.json();
+    }).then(function (data) {
+      if (seq !== discoverSeq) return; // llegó una respuesta vieja
+      discovered = parseOverpass(data);
+      renderMarkers(); renderList();
+      setDiscoverStatus(discovered.length
+        ? discovered.length + " sitios en esta zona"
+        : "Sin sitios de estas categorías aquí.");
+    }).catch(function () {
+      if (seq !== discoverSeq) return;
+      setDiscoverStatus("No se pudo cargar (servicio ocupado). Prueba de nuevo.");
+    });
+  }
+  function parseOverpass(data) {
+    var out = [];
+    var els = (data && data.elements) || [];
+    for (var i = 0; i < els.length; i++) {
+      var e = els[i];
+      var lat = e.lat != null ? e.lat : (e.center && e.center.lat);
+      var lng = e.lon != null ? e.lon : (e.center && e.center.lon);
+      if (lat == null || lng == null) continue;
+      var tags = e.tags || {};
+      var name = tags.name || tags["name:es"] || "(sin nombre)";
+      out.push({
+        id: "osm-" + e.type + "-" + e.id,
+        lat: lat, lng: lng, name: name,
+        cat: osmCategoryOf(tags), osm: true
+      });
+    }
+    return out;
+  }
+  function osmCategoryOf(t) {
+    if (t.amenity === "restaurant") return "restaurante";
+    if (t.amenity === "bar" || t.amenity === "cafe" || t.amenity === "pub") return "bar";
+    if (t.tourism === "viewpoint") return "mirador";
+    if (t.man_made === "lighthouse") return "faro";
+    if (t.natural === "beach") return "playa";
+    if (t.tourism === "camp_site") return "acampada";
+    if (t.place === "town" || t.place === "village" || t.place === "hamlet") return "pueblo";
+    if (t.tourism === "hotel" || t.tourism === "hostel" || t.tourism === "guest_house" ||
+        t.tourism === "motel" || t.tourism === "chalet") return "alojamiento";
+    if (t.historic) return "monumento";
+    if (t.natural) return "naturaleza";
+    return "otro";
   }
 
   // --- Filtros UI ---------------------------------------------------------
@@ -361,6 +491,7 @@
         filters.cats[c.id] = !filters.cats[c.id];
         b.setAttribute("aria-pressed", filters.cats[c.id] ? "true" : "false");
         refresh();
+        if (viewMode === "all") scheduleDiscover();
       });
       box.appendChild(b);
     });
@@ -380,6 +511,7 @@
     $("#filter-text").value = ""; $("#filter-rating").value = "0"; $("#filter-status").value = "todos";
     document.querySelectorAll("#filter-cats .chip").forEach(function (b) { b.setAttribute("aria-pressed", "true"); });
     refresh();
+    if (viewMode === "all") scheduleDiscover();
   }
 
   // --- Exportar / importar ------------------------------------------------
@@ -389,7 +521,7 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = (CFG.shortName || "mapa").toLowerCase().replace(/\s+/g, "-") +
+    a.download = (CFG.shortName || "rastro").toLowerCase().replace(/\s+/g, "-") +
                  "-" + new Date().toISOString().slice(0, 10) + ".json";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
@@ -409,12 +541,14 @@
             if (!p.cat || !CAT_BY_ID[p.cat]) p.cat = (CAT_BY_ID.otro ? "otro" : CATEGORIES[0].id);
             if (!p.status) p.status = DEFAULT_STATUS;
             p.stars = Math.max(0, Math.min(5, p.stars || 0));
+            delete p.osm;
             toAdd.push(p); existing[p.id] = true; added++;
           }
         });
         var merged = points.concat(toAdd);
         Store.replaceAll(merged).then(function () {
-          points = merged; refresh();
+          points = merged;
+          if (viewMode === "mine") refresh();
           toast("Importados " + added + " puntos.");
         }).catch(function () { toast("No se pudo importar."); });
       } catch (e) { toast("Archivo no válido."); }
@@ -438,9 +572,7 @@
   function showGeoResults(list) {
     var ul = $("#geosearch-results"); ul.innerHTML = "";
     geoItems = list; geoActiveIndex = -1;
-    if (!list.length) {
-      ul.appendChild(el("li", "empty", "Sin resultados")); ul.hidden = false; return;
-    }
+    if (!list.length) { ul.appendChild(el("li", "empty", "Sin resultados")); ul.hidden = false; return; }
     list.forEach(function (item, i) {
       var li = el("li", null, item.display_name);
       li.addEventListener("click", function () { pickGeo(i); });
@@ -451,9 +583,9 @@
   function pickGeo(i) {
     var item = geoItems[i]; if (!item) return;
     map.setView([parseFloat(item.lat), parseFloat(item.lon)], 15, { animate: true });
-    $("#geosearch-results").hidden = true;
-    $("#geosearch-input").value = "";
-    toast("¿Buen sitio? Pulsa “Añadir” para guardarlo.");
+    $("#geosearch-results").hidden = true; $("#geosearch-input").value = "";
+    if (viewMode === "all") scheduleDiscover();
+    else toast("¿Buen sitio? Pulsa “Añadir” para guardarlo.");
   }
 
   // --- Eventos ------------------------------------------------------------
@@ -468,6 +600,10 @@
         map.setView([pos.coords.latitude, pos.coords.longitude], 14, { animate: true });
       }, function () { toast("No se pudo obtener tu ubicación."); },
       { enableHighAccuracy: true, timeout: 8000 });
+    });
+
+    document.querySelectorAll("#mode-toggle .mode-btn").forEach(function (b) {
+      b.addEventListener("click", function () { setViewMode(b.dataset.mode); });
     });
 
     $("#editor-form").addEventListener("submit", submitEditor);
@@ -493,6 +629,7 @@
       CATEGORIES.forEach(function (c) { filters.cats[c.id] = anyOff; });
       document.querySelectorAll("#filter-cats .chip").forEach(function (b) { b.setAttribute("aria-pressed", anyOff ? "true" : "false"); });
       refresh();
+      if (viewMode === "all") scheduleDiscover();
     });
 
     $("#btn-export").addEventListener("click", exportData);
@@ -536,13 +673,9 @@
     buildStatusInput();
     wireEvents();
     if (window.innerWidth <= 720) $("#panel").classList.add("is-hidden");
-    Store.getAll().then(function (list) {
-      points = list;
-      refresh();
-    });
+    Store.getAll().then(function (list) { points = list; refresh(); });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else { init(); }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();

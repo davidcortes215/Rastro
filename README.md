@@ -18,6 +18,11 @@ servidor propio en esta primera fase.
 
 ## Características
 
+- **Dos modos de vista** con un interruptor:
+  - **Mis PDI** → tus puntos guardados (tu diario de experiencias).
+  - **Todos (España)** → sitios reales de OpenStreetMap en la zona que estás
+    viendo (restaurantes, miradores, faros, playas, pueblos…), que puedes
+    **guardar en los tuyos** con un clic para valorarlos y anotarlos.
 - **Mapa** con Leaflet + teselas de OpenStreetMap. Al abrir intenta centrarse
   en la ubicación del usuario; si no hay permiso, muestra la vista configurada.
 - **Puntos de interés** por categorías, con marcador de color y emoji.
@@ -35,12 +40,12 @@ servidor propio en esta primera fase.
 ```
 rastro/
 ├── index.html          Estructura de la interfaz
-├── css/styles.css      Estilos (el color de acento viene de la config)
-├── js/
-│   ├── config.js       ← CONFIGURACIÓN white-label (edita solo esto para personalizar)
-│   ├── store.js        Capa de datos intercambiable (local hoy, nube mañana)
-│   └── app.js          Lógica de la aplicación
-├── assets/favicon.svg  Icono
+├── styles.css          Estilos (el color de acento viene de la config)
+├── config.js           ← CONFIGURACIÓN white-label (edita solo esto para personalizar)
+├── store.js            Capa de datos intercambiable (local hoy, nube mañana)
+├── app.js              Lógica de la aplicación
+├── favicon.svg         Icono
+├── README.md
 └── .nojekyll           Para GitHub Pages
 ```
 
@@ -120,6 +125,12 @@ resto de la interfaz no cambia.**
   gratuitos con límites de uso pensados para volúmenes moderados. Para
   producción con tráfico alto, contrata un proveedor de mapas/geocodificación y
   cámbialo en `js/config.js` (`map.tiles` y `map.geocode.endpoint`).
+- **Descubrir sitios** (modo "Todos") usa la **Overpass API** de OpenStreetMap,
+  también gratuita y con límites de uso. Solo consulta la **zona visible** (no
+  todo el país) y a partir de un zoom mínimo, para no sobrecargar el servicio ni
+  el navegador. Se configura en `discover` (`overpassEndpoint`, `minZoom`,
+  `maxResults` y el mapeo `osm` de categoría → etiquetas de OSM). Para producción
+  con tráfico alto conviene un endpoint Overpass propio o un proveedor de POIs.
 
 ---
 

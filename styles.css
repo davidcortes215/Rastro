@@ -155,6 +155,23 @@ select.field-input { cursor: pointer; }
 .chip[aria-pressed="false"] { opacity: 0.4; }
 .chip[aria-pressed="true"] { border-color: var(--negro); }
 
+/* Interruptor de modo (Mis PDI / Todos) */
+.panel-section--mode { padding-top: 0.9rem; }
+.mode-toggle {
+  display: flex; width: 100%;
+  border: 1px solid var(--hairline-fuerte); border-radius: 8px; overflow: hidden;
+}
+.mode-btn {
+  flex: 1; background: var(--blanco); border: none;
+  padding: 0.5rem 0.4rem; font-size: 0.85rem; font-weight: 500; color: var(--tinta-suave);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.mode-btn + .mode-btn { border-left: 1px solid var(--hairline-fuerte); }
+.mode-btn.is-on { background: var(--accent); color: var(--blanco); }
+
+/* En modo "Todos" no aplican los filtros de valoración/estado */
+.app.mode-all .panel-section--row { display: none; }
+
 .linkbtn {
   background: none; border: none; color: var(--accent);
   font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.03em; text-transform: uppercase; padding: 0;
@@ -210,6 +227,23 @@ select.field-input { cursor: pointer; }
 }
 .poi-pin span { transform: rotate(45deg); font-size: 0.95rem; line-height: 1; }
 .poi-pin.is-pending { opacity: 0.72; border-style: dashed; }
+
+/* Punto descubierto (modo "Todos"): círculo, para distinguirlo de los tuyos */
+.poi-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--blanco); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  display: flex; align-items: center; justify-content: center;
+}
+.poi-dot span { font-size: 0.72rem; line-height: 1; }
+
+/* Indicador del modo descubrir */
+.discover-status {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  background: var(--blanco); color: var(--tinta);
+  padding: 0.4rem 0.85rem; border-radius: 999px; font-size: 0.8rem; z-index: 440;
+  box-shadow: var(--sombra); border: 1px solid var(--hairline);
+  max-width: calc(100% - 24px); text-align: center;
+}
 
 .leaflet-popup-content-wrapper { border-radius: 8px; }
 .leaflet-popup-content { margin: 0.7rem 0.85rem; }

@@ -48,8 +48,15 @@
 
       <!-- Panel: filtros + lista -->
       <aside class="panel" id="panel" aria-label="Filtros y listado de puntos">
+        <div class="panel-section panel-section--mode">
+          <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Modo de vista">
+            <button type="button" class="mode-btn is-on" data-mode="mine" aria-pressed="true">Mis PDI</button>
+            <button type="button" class="mode-btn" data-mode="all" aria-pressed="false">Todos&nbsp;(España)</button>
+          </div>
+        </div>
+
         <div class="panel-section">
-          <label class="label" for="filter-text">Buscar en mis puntos</label>
+          <label class="label" for="filter-text" id="filter-text-label">Buscar en mis puntos</label>
           <input type="search" class="field-input" id="filter-text" placeholder="Nombre, nota, lugar…">
         </div>
 
@@ -98,6 +105,7 @@
       <!-- Mapa -->
       <div class="map-wrap">
         <div id="map"></div>
+        <div class="discover-status" id="discover-status" hidden></div>
         <div class="map-hint" id="map-hint" hidden>
           <span>Toca el mapa donde quieras colocar el punto</span>
           <button type="button" class="linkbtn" id="btn-cancel-add">Cancelar</button>

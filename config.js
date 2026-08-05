@@ -38,6 +38,28 @@ window.APP_CONFIG = {
     }
   },
 
+  /* Descubrir sitios de OpenStreetMap (modo "Todos") ----------------------- */
+  discover: {
+    enabled: true,
+    overpassEndpoint: "https://overpass-api.de/api/interpreter",
+    minZoom: 12,        // por debajo de este zoom no se consulta (demasiada área)
+    maxResults: 250,    // tope de resultados por consulta
+    // Etiquetas de OSM que se consultan para cada categoría. Las categorías
+    // que no aparezcan aquí no se buscan en modo "Todos".
+    osm: {
+      restaurante: ['["amenity"="restaurant"]'],
+      bar:         ['["amenity"~"^(bar|cafe|pub)$"]'],
+      mirador:     ['["tourism"="viewpoint"]'],
+      faro:        ['["man_made"="lighthouse"]'],
+      playa:       ['["natural"="beach"]'],
+      acampada:    ['["tourism"="camp_site"]'],
+      pueblo:      ['["place"~"^(town|village|hamlet)$"]'],
+      alojamiento: ['["tourism"~"^(hotel|hostel|guest_house|motel|chalet)$"]'],
+      monumento:   ['["historic"~"^(monument|memorial|castle|ruins|archaeological_site)$"]'],
+      naturaleza:  ['["natural"~"^(peak|waterfall|spring|cave_entrance)$"]']
+    }
+  },
+
   /* Estados de un punto ---------------------------------------------------- */
   statuses: [
     { id: "visitado",  label: "Visitado"  },
