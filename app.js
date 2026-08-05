@@ -402,11 +402,25 @@
   }
 
   // --- Descubrir (Overpass) -----------------------------------------------
+  // Los servidores Overpass públicos se saturan con frecuencia y responden
+  // 429/504. Por eso se prueban varios en orden hasta que uno conteste.
   var discoverTimer, discoverSeq = 0;
-  function setDiscoverStatus(msg) {
+  function overpassEndpoints() {
+    if (DISCOVER.overpassEndpoints && DISCOVER.overpassEndpoints.length) return DISCOVER.overpassEndpoints;
+    return [DISCOVER.overpassEndpoint || "https://overpass-api.de/api/interpreter"];
+  }
+  function setDiscoverStatus(msg, withRetry) {
     var d = $("#discover-status");
     if (!msg) { d.hidden = true; d.textContent = ""; return; }
-    d.textContent = msg; d.hidden = false;
+    d.textContent = msg;
+    if (withRetry) {
+      var btn = el("button", "linkbtn discover-retry", "Reintentar");
+      btn.type = "button";
+      btn.addEventListener("click", function () { runDiscover(); });
+      d.appendChild(document.createTextNode(" "));
+      d.appendChild(btn);
+    }
+    d.hidden = false;
   }
   function scheduleDiscover() {
     clearTimeout(discoverTimer);
@@ -437,30 +451,41 @@
     var b = map.getBounds();
     var bbox = b.getSouth().toFixed(5) + "," + b.getWest().toFixed(5) + "," +
                b.getNorth().toFixed(5) + "," + b.getEast().toFixed(5);
-    var body = "[out:json][timeout:25];(";
+    var body = "[out:json][timeout:20];(";
     selectors.forEach(function (sel) { body += "nwr" + sel + "(" + bbox + ");"; });
     body += ");out center " + (DISCOVER.maxResults || 250) + ";";
 
     var seq = ++discoverSeq;
+    var servers = overpassEndpoints();
     setDiscoverStatus("Buscando sitios…");
-    fetch(DISCOVER.overpassEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: body
-    }).then(function (r) {
-      if (!r.ok) throw new Error("overpass " + r.status);
-      return r.json();
-    }).then(function (data) {
-      if (seq !== discoverSeq) return; // llegó una respuesta vieja
-      discovered = parseOverpass(data);
-      renderMarkers(); renderList();
-      setDiscoverStatus(discovered.length
-        ? discovered.length + " sitios en esta zona"
-        : "Sin sitios de estas categorías aquí.");
-    }).catch(function () {
-      if (seq !== discoverSeq) return;
-      setDiscoverStatus("No se pudo cargar (servicio ocupado). Prueba de nuevo.");
-    });
+
+    // Prueba los servidores en orden hasta que uno responda.
+    function attempt(i) {
+      if (seq !== discoverSeq) return;               // hay una búsqueda más nueva
+      if (i >= servers.length) {                     // se agotaron todos
+        setDiscoverStatus("Los servidores de OpenStreetMap están saturados.", true);
+        return;
+      }
+      if (i > 0) setDiscoverStatus("Servidor ocupado, probando otro…");
+      fetch(servers[i], {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: body
+      }).then(function (r) {
+        if (!r.ok) throw new Error("overpass " + r.status);
+        return r.json();
+      }).then(function (data) {
+        if (seq !== discoverSeq) return;
+        discovered = parseOverpass(data);
+        renderMarkers(); renderList();
+        setDiscoverStatus(discovered.length
+          ? discovered.length + " sitios en esta zona"
+          : "Sin sitios de estas categorías aquí.");
+      }).catch(function () {
+        attempt(i + 1);
+      });
+    }
+    attempt(0);
   }
   function parseOverpass(data) {
     var out = [];
