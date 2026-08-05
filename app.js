@@ -59,10 +59,21 @@
   }
 
   // --- Configuración / marca ----------------------------------------------
+  function hexToRgb(hex) {
+    var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
+    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [234, 115, 23];
+  }
   function applyConfig() {
-    document.documentElement.style.setProperty("--accent", CFG.accent || "#EA7317");
+    var root = document.documentElement;
+    var acc = CFG.accent || "#EA7317";
+    var rgb = hexToRgb(acc);
+    root.style.setProperty("--accent", acc);
+    root.style.setProperty("--accent-weak", "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ",0.12)");
+    root.style.setProperty("--accent-weak-2", "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ",0.24)");
     document.title = CFG.name;
     $("#brand-name").textContent = CFG.name;
+    var mh = $("#panel-mhead-title");
+    if (mh) mh.textContent = CFG.name;
     if (!CFG.map.geocode || !CFG.map.geocode.enabled) $("#geosearch").hidden = true;
     if (!DISCOVER.enabled) $("#mode-toggle").hidden = true;
   }
@@ -365,7 +376,9 @@
   // --- Panel --------------------------------------------------------------
   function setPanelHidden(hidden) {
     $("#panel").classList.toggle("is-hidden", hidden);
-    setTimeout(function () { map.invalidateSize(); }, 260);
+    var bd = $("#panel-backdrop");
+    if (bd) bd.hidden = hidden || window.innerWidth > 720; // fondo solo en móvil con panel abierto
+    setTimeout(function () { if (map) map.invalidateSize(); }, 260);
   }
   function togglePanel() { setPanelHidden(!$("#panel").classList.contains("is-hidden")); }
 
@@ -593,6 +606,8 @@
     $("#btn-add").addEventListener("click", function () { setAddMode(!addMode); });
     $("#btn-cancel-add").addEventListener("click", function () { setAddMode(false); });
     $("#btn-panel").addEventListener("click", togglePanel);
+    var pClose = $("#panel-close"); if (pClose) pClose.addEventListener("click", function () { setPanelHidden(true); });
+    var pBack = $("#panel-backdrop"); if (pBack) pBack.addEventListener("click", function () { setPanelHidden(true); });
     $("#btn-locate").addEventListener("click", function () {
       if (!navigator.geolocation) { toast("Geolocalización no disponible."); return; }
       toast("Buscando tu ubicación…");

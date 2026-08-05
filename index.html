@@ -48,6 +48,10 @@
 
       <!-- Panel: filtros + lista -->
       <aside class="panel" id="panel" aria-label="Filtros y listado de puntos">
+        <div class="panel-mhead">
+          <span class="panel-mhead-title" id="panel-mhead-title">Rastro</span>
+          <button type="button" class="panel-close" id="panel-close" aria-label="Cerrar panel">&times;</button>
+        </div>
         <div class="panel-section panel-section--mode">
           <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Modo de vista">
             <button type="button" class="mode-btn is-on" data-mode="mine" aria-pressed="true">Mis PDI</button>
@@ -101,6 +105,8 @@
           <input type="file" id="import-file" accept="application/json" hidden>
         </div>
       </aside>
+
+      <div class="panel-backdrop" id="panel-backdrop" hidden></div>
 
       <!-- Mapa -->
       <div class="map-wrap">
