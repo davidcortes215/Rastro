@@ -295,6 +295,22 @@ select.field-input { cursor: pointer; }
 
 .discover-retry { margin-left: 0.15rem; }
 
+/* Aviso sobre el mapa cuando no hay puntos propios */
+.map-empty {
+  position: absolute; z-index: 430;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(360px, calc(100% - 2.5rem));
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--elev-3);
+  padding: 1.15rem 1.2rem; text-align: center;
+  pointer-events: none;                 /* deja usar el mapa por debajo */
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.map-empty-title { font-weight: 700; font-size: 1rem; margin-bottom: 0.3rem; }
+.map-empty-sub { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; }
+.map-empty-btn { margin-top: 0.9rem; pointer-events: auto; }
+
 .poi-pin {
   width: 32px; height: 32px;
   border-radius: 50% 50% 50% 0; transform: rotate(-45deg);

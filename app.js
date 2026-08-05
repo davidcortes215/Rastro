@@ -545,7 +545,26 @@
       var o = el("option", null, s.label + "s"); o.value = s.id; fs.appendChild(o);
     });
   }
-  function refresh() { renderMarkers(); renderList(); }
+  function refresh() { renderMarkers(); renderList(); updateMapEmpty(); }
+
+  // Aviso sobre el mapa cuando estás en "Mis PDI" y todavía no has guardado
+  // nada: sin él, el mapa vacío parece un error.
+  function updateMapEmpty() {
+    var box = $("#map-empty");
+    if (!box) return;
+    if (viewMode !== "mine" || points.length > 0) { box.hidden = true; return; }
+    box.innerHTML = "";
+    box.appendChild(el("div", "map-empty-title", "Aún no tienes puntos guardados"));
+    box.appendChild(el("div", "map-empty-sub",
+      "Pulsa “+ Añadir” y toca el mapa para guardar un sitio con tu valoración y tus notas."));
+    if (DISCOVER.enabled) {
+      var b = el("button", "btn btn--solid map-empty-btn", "Descubrir sitios de la zona");
+      b.type = "button";
+      b.addEventListener("click", function () { setViewMode("all"); });
+      box.appendChild(b);
+    }
+    box.hidden = false;
+  }
   function resetFilters() {
     filters.text = ""; filters.rating = 0; filters.status = "todos";
     CATEGORIES.forEach(function (c) { filters.cats[c.id] = true; });
