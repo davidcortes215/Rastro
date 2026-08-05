@@ -17,6 +17,18 @@ window.APP_CONFIG = {
   /* Clave de almacenamiento local (cámbiala para aislar datos por cliente) - */
   storageKey: "rastro:puntos:v1",
 
+  /* Nube (registro de usuarios + datos por usuario) ------------------------
+     Si url y anonKey están vacíos, la app funciona en modo local (sin
+     registro), como antes. Al rellenarlos con los datos de tu proyecto
+     Supabase, la app exige iniciar sesión y guarda los puntos de cada
+     usuario en la nube. Estas claves son públicas por diseño: la seguridad
+     la garantizan las políticas RLS de la base de datos. */
+  cloud: {
+    provider: "supabase",
+    url: "",       // https://TU-PROYECTO.supabase.co
+    anonKey: ""    // clave pública "anon"
+  },
+
   /* Mapa ------------------------------------------------------------------- */
   map: {
     center: [40.0, -3.7],           // vista inicial [lat, lng]

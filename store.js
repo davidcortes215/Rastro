@@ -65,5 +65,6 @@
     }
   };
 
-  window.Store = LocalStore;
+  window.LocalStore = LocalStore;
+  window.Store = LocalStore; // por defecto; cloud.js lo cambia si hay sesión
 })();

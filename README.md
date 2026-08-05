@@ -42,7 +42,8 @@ rastro/
 ├── index.html          Estructura de la interfaz
 ├── styles.css          Estilos (el color de acento viene de la config)
 ├── config.js           ← CONFIGURACIÓN white-label (edita solo esto para personalizar)
-├── store.js            Capa de datos intercambiable (local hoy, nube mañana)
+├── store.js            Capa de datos local (localStorage)
+├── cloud.js            Registro/sesión + datos por usuario en la nube (Supabase)
 ├── app.js              Lógica de la aplicación
 ├── favicon.svg         Icono
 ├── README.md
@@ -88,30 +89,54 @@ bucket S3 o cualquier hosting estático. No requiere build.
 
 ## Dónde se guardan los datos
 
-En esta fase los puntos se guardan en el **navegador** del usuario
-(`localStorage`), a través de la capa `js/store.js`. Implicaciones:
+La app tiene **dos modos**, según `cloud` en `config.js`:
 
-- Son **privados** y funcionan **sin cuenta ni conexión** al backend.
-- Están **ligados a ese navegador/dispositivo**: si el usuario cambia de
-  equipo o borra los datos de navegación, se pierden. Por eso la app incluye
-  **exportar / importar** en JSON como copia de seguridad y traspaso.
+- **Local** (por defecto, `cloud.url`/`anonKey` vacíos): los puntos se guardan
+  en el **navegador** (`localStorage`). Sin registro ni conexión. Los datos van
+  ligados a ese dispositivo; por eso existe **exportar / importar** en JSON.
+- **Nube** (`cloud.url`/`anonKey` configurados): la app **exige registro/inicio
+  de sesión** y guarda los puntos de **cada usuario** en la nube (Supabase),
+  sincronizados entre dispositivos.
 
-### Migración a la nube (fase 2)
-
-La persistencia está aislada tras una interfaz asíncrona en `js/store.js`:
+La persistencia está aislada tras una interfaz asíncrona común
+(`js/store.js` para local, `js/cloud.js` para Supabase):
 
 ```js
 Store.getAll()            // → Promise<Point[]>
 Store.create(point)       // → Promise<Point>
-Store.update(id, data)    // → Promise<Point|null>
+Store.update(id, point)   // → Promise<Point|null>
 Store.remove(id)          // → Promise<void>
 Store.replaceAll(points)  // → Promise<void>
 ```
 
-Como la aplicación ya usa `await Store.*`, para añadir cuentas y sincronización
-entre dispositivos basta con crear otra implementación de estos métodos que use
-`fetch()` contra una API (y su base de datos) y asignarla a `window.Store`. **El
-resto de la interfaz no cambia.**
+### Activar el modo nube (Supabase)
+
+1. Crea un proyecto gratuito en [supabase.com](https://supabase.com).
+2. En **SQL Editor**, ejecuta:
+
+   ```sql
+   create table if not exists public.points (
+     id text primary key,
+     user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+     data jsonb not null,
+     updated_at timestamptz not null default now()
+   );
+   alter table public.points enable row level security;
+   create policy "own_select" on public.points for select using (auth.uid() = user_id);
+   create policy "own_insert" on public.points for insert with check (auth.uid() = user_id);
+   create policy "own_update" on public.points for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+   create policy "own_delete" on public.points for delete using (auth.uid() = user_id);
+   ```
+
+3. **Authentication → Providers → Email**: activa el proveedor. Para registro
+   instantáneo (sin confirmación por correo) desactiva *Confirm email*; déjalo
+   activo si prefieres verificar el correo en producción.
+4. En **Project Settings → API**, copia **Project URL** y la clave **anon
+   public**, y pégalas en `config.js` → `cloud.url` y `cloud.anonKey`.
+
+Las claves `anon` son **públicas por diseño**: la seguridad la garantizan las
+políticas RLS (cada usuario solo accede a sus filas). Para volver al modo local,
+vacía `cloud.url` y `cloud.anonKey`.
 
 ---
 

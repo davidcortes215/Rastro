@@ -103,6 +103,7 @@
           <button type="button" class="linkbtn" id="btn-export">Exportar</button>
           <button type="button" class="linkbtn" id="btn-import">Importar</button>
           <input type="file" id="import-file" accept="application/json" hidden>
+          <button type="button" class="linkbtn panel-footer-end" id="btn-logout" hidden>Cerrar sesión</button>
         </div>
       </aside>
 
@@ -165,9 +166,35 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+  <!-- Pantalla de registro / inicio de sesión (solo visible en modo nube) -->
+  <div class="auth-screen" id="auth-screen" hidden>
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2c-3.9 0-7 3.1-7 7 0 5 7 13 7 13s7-8 7-13c0-3.9-3.1-7-7-7z" fill="currentColor"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>
+        </span>
+        <span class="auth-brand-name" id="auth-brand-name">Rastro</span>
+      </div>
+      <h1 class="auth-title" id="auth-title">Entrar</h1>
+      <p class="auth-sub">Guarda y sincroniza tus lugares en tu cuenta.</p>
+      <form id="auth-form" class="auth-form">
+        <input type="email" id="auth-email" class="field-input" placeholder="Correo electrónico" autocomplete="email" required>
+        <input type="password" id="auth-password" class="field-input" placeholder="Contraseña" autocomplete="current-password" required>
+        <p class="auth-error" id="auth-error" role="alert"></p>
+        <button type="submit" class="btn btn--solid auth-submit" id="auth-submit">Entrar</button>
+      </form>
+      <p class="auth-switch">
+        <span id="auth-switch-text">¿No tienes cuenta?</span>
+        <button type="button" class="linkbtn" id="auth-switch-btn">Crear cuenta</button>
+      </p>
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="store.js"></script>
-  <script src="app.js" defer></script>
+  <script src="app.js"></script>
+  <script src="cloud.js"></script>
 </body>
 </html>

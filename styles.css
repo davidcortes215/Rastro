@@ -364,6 +364,35 @@ select.field-input { cursor: pointer; }
 .editor .btn--ghost { color: var(--ink); background: var(--surface); border-color: var(--line-strong); width: auto; padding: 0 0.95rem; }
 .editor .btn--ghost:hover { border-color: var(--ink); background: var(--surface); }
 
+.panel-footer-end { margin-left: auto; }
+
+/* --------------------------------------------------------------------------
+   Pantalla de registro / inicio de sesión
+   -------------------------------------------------------------------------- */
+.auth-screen {
+  position: fixed; inset: 0; z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.2rem;
+  background: linear-gradient(160deg, #1b1b1e 0%, #101012 100%);
+}
+.auth-card {
+  width: min(400px, 100%);
+  background: var(--surface); border-radius: var(--r-lg);
+  box-shadow: var(--elev-3);
+  padding: 1.8rem 1.6rem 1.6rem;
+}
+.auth-brand { display: flex; align-items: center; gap: 0.55rem; margin-bottom: 1.3rem; }
+.auth-brand .brand-mark { color: var(--accent); display: inline-flex; }
+.auth-brand-name { font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; }
+.auth-title { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }
+.auth-sub { color: var(--ink-soft); font-size: 0.9rem; margin: 0.25rem 0 1.2rem; }
+.auth-form { display: flex; flex-direction: column; gap: 0.65rem; }
+.auth-form .field-input { height: 44px; }
+.auth-submit { height: 44px; width: 100%; justify-content: center; font-size: 0.95rem; margin-top: 0.2rem; }
+.auth-error { color: var(--accent); font-size: 0.82rem; min-height: 1.1rem; margin: 0.1rem 0; }
+.auth-switch { margin-top: 1rem; font-size: 0.88rem; color: var(--ink-soft); text-align: center; }
+.auth-switch .linkbtn { font-family: var(--sans); font-size: 0.88rem; text-transform: none; letter-spacing: 0; font-weight: 600; }
+
 /* --------------------------------------------------------------------------
    Toast
    -------------------------------------------------------------------------- */

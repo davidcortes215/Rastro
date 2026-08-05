@@ -74,6 +74,8 @@
     $("#brand-name").textContent = CFG.name;
     var mh = $("#panel-mhead-title");
     if (mh) mh.textContent = CFG.name;
+    var ab = $("#auth-brand-name");
+    if (ab) ab.textContent = CFG.name;
     if (!CFG.map.geocode || !CFG.map.geocode.enabled) $("#geosearch").hidden = true;
     if (!DISCOVER.enabled) $("#mode-toggle").hidden = true;
   }
@@ -349,7 +351,8 @@
     };
     if (editingId) {
       var id = editingId;
-      Store.update(id, data).then(function () {
+      var updated = Object.assign({}, pointById(id), data); // punto completo (para la nube)
+      Store.update(id, updated).then(function () {
         var p = pointById(id); if (p) Object.assign(p, data);
         refresh(); closeEditor(); toast("Punto actualizado.");
       }).catch(function () { toast("No se pudo guardar."); });
@@ -680,7 +683,9 @@
   }
 
   // --- Arranque -----------------------------------------------------------
-  function init() {
+  // La app no arranca sola: el controlador de sesión (cloud.js) decide cuándo,
+  // según haya o no que iniciar sesión. Así funciona igual en modo local o nube.
+  function start() {
     applyConfig();
     initMap();
     buildCategoryUI();
@@ -688,9 +693,18 @@
     buildStatusInput();
     wireEvents();
     if (window.innerWidth <= 720) $("#panel").classList.add("is-hidden");
-    Store.getAll().then(function (list) { points = list; refresh(); });
+  }
+  function loadPoints() {
+    return Store.getAll().then(function (list) {
+      points = Array.isArray(list) ? list : [];
+      refresh();
+    }).catch(function () { points = []; refresh(); });
+  }
+  function clearData() {
+    points = []; discovered = []; viewMode = "mine";
+    document.querySelector(".app").classList.remove("mode-all");
+    refresh();
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
+  window.RastroApp = { start: start, loadPoints: loadPoints, clearData: clearData };
 })();
