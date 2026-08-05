@@ -25,8 +25,8 @@ window.APP_CONFIG = {
      la garantizan las políticas RLS de la base de datos. */
   cloud: {
     provider: "supabase",
-    url: "",       // https://TU-PROYECTO.supabase.co
-    anonKey: ""    // clave pública "anon"
+    url: "https://mbeulgxttoqzrumfqzej.supabase.co",
+    anonKey: "sb_publishable_yTVfhyC6HXVZmw2xSAW5Uw_H6G75s6M"
   },
 
   /* Mapa ------------------------------------------------------------------- */
