@@ -427,8 +427,11 @@ select.field-input { cursor: pointer; }
 @media (max-width: 720px) {
   .brand-name { display: none; }
   .btn-add-text { display: none; }
-  .btn--solid { width: 40px; padding: 0; justify-content: center; }
-  .btn-plus { font-size: 1.35rem; }
+  /* Solo los botones de la barra superior se vuelven cuadrados; si no, el
+     "Guardar" del editor y el "Entrar" del acceso quedan estrechos y el
+     texto se sale. */
+  .topbar .btn--solid { width: 40px; padding: 0; justify-content: center; }
+  .topbar .btn-plus { font-size: 1.35rem; }
   .geosearch { max-width: none; }
 
   .panel {
