@@ -46,6 +46,24 @@
         });
         if (!rows.length) return Promise.resolve();
         return sb.from("points").upsert(rows).then(check);
+      },
+      // Las fotos van a Supabase Storage, cada usuario en su propia carpeta.
+      uploadPhoto: function (blob, pointId) {
+        var bucket = cloud.photoBucket || "fotos";
+        var path = currentUserId + "/" + (pointId || "sueltas") + "/" +
+                   Date.now() + "-" + Math.random().toString(36).slice(2, 7) + ".jpg";
+        return sb.storage.from(bucket).upload(path, blob, {
+          contentType: "image/jpeg", upsert: false
+        }).then(function (r) {
+          check(r);
+          var pub = sb.storage.from(bucket).getPublicUrl(path);
+          return { url: pub.data.publicUrl, path: path };
+        });
+      },
+      deletePhoto: function (photo) {
+        if (!photo || !photo.path) return Promise.resolve();
+        var bucket = cloud.photoBucket || "fotos";
+        return sb.storage.from(bucket).remove([photo.path]).then(function () {});
       }
     };
   }

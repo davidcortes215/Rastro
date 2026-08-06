@@ -240,9 +240,16 @@
     var stars = (p.status === "pendiente" && !p.stars) ? "" :
       '<span class="popup-stars">' + starsText(p.stars) + "</span> ";
     var notes = p.notes ? '<div class="popup-notes">' + escapeHtml(p.notes) + "</div>" : "";
+    var fotos = "";
+    if (p.photos && p.photos.length) {
+      fotos = '<div class="popup-photos">' + p.photos.map(function (ph) {
+        return '<img src="' + escapeHtml(ph.url) + '" alt="" loading="lazy">';
+      }).join("") + "</div>";
+    }
     return '<div class="popup" data-id="' + p.id + '">' +
       '<div class="popup-name">' + escapeHtml(p.name) + "</div>" +
       '<div class="popup-meta">' + stars + escapeHtml(meta) + "</div>" +
+      fotos +
       notes +
       '<div class="popup-actions">' +
         '<button type="button" data-act="edit">Editar</button>' +
@@ -299,6 +306,12 @@
       var icon = el("span", "poi-card-icon"); icon.style.background = c.color; icon.textContent = c.emoji;
       top.appendChild(icon);
       top.appendChild(el("span", "poi-card-name", p.name));
+      if (p.photos && p.photos.length) {
+        var mini = document.createElement("img");
+        mini.className = "poi-card-photo";
+        mini.src = p.photos[0].url; mini.alt = ""; mini.loading = "lazy";
+        top.appendChild(mini);
+      }
       li.appendChild(top);
       var meta = el("div", "poi-card-meta");
       if (p.osm) {
@@ -341,10 +354,113 @@
     return null;
   }
   function deletePoint(id) {
+    var p = pointById(id);
+    var fotos = (p && p.photos) || [];
     Store.remove(id).then(function () {
-      points = points.filter(function (p) { return p.id !== id; });
+      points = points.filter(function (x) { return x.id !== id; });
       refresh(); toast("Punto eliminado.");
+      // Las fotos se borran después: si alguna falla, el punto ya no está.
+      if (Store.deletePhoto) fotos.forEach(function (ph) { Store.deletePhoto(ph); });
     }).catch(function () { toast("No se pudo eliminar."); });
+  }
+
+  // --- Fotos ---------------------------------------------------------------
+  var PHOTOS = CFG.photos || { enabled: false };
+  var draftPhotos = [];       // fotos del punto que se está editando
+  var initialPhotos = [];     // las que ya tenía al abrir el editor
+  var photosBusy = 0;
+
+  // Las fotos de móvil pesan varios MB: se reescalan y recomprimen en el
+  // propio navegador antes de subirlas (quedan en torno a 150 KB).
+  function compressImage(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\//.test(file.type)) { reject(new Error("no-imagen")); return; }
+      var maxSize = PHOTOS.maxSize || 1600;
+      var quality = PHOTOS.quality || 0.72;
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var scale = Math.min(1, maxSize / Math.max(w, h));
+        var cw = Math.max(1, Math.round(w * scale));
+        var ch = Math.max(1, Math.round(h * scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = cw; canvas.height = ch;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, ch); // evita fondo negro en PNG con transparencia
+        ctx.drawImage(img, 0, 0, cw, ch);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function (blob) {
+          blob ? resolve(blob) : reject(new Error("compresion"));
+        }, "image/jpeg", quality);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("carga")); };
+      img.src = url;
+    });
+  }
+
+  function renderDraftPhotos() {
+    var box = $("#poi-photos");
+    if (!box) return;
+    box.innerHTML = "";
+    draftPhotos.forEach(function (ph, i) {
+      var fig = el("div", "photo-thumb");
+      var im = document.createElement("img");
+      im.src = ph.url; im.alt = "Foto " + (i + 1); im.loading = "lazy";
+      fig.appendChild(im);
+      var del = el("button", "photo-del", "×");
+      del.type = "button";
+      del.title = "Quitar foto";
+      del.setAttribute("aria-label", "Quitar foto " + (i + 1));
+      del.addEventListener("click", function () {
+        var removed = draftPhotos.splice(i, 1)[0];
+        if (removed && removed.path && Store.deletePhoto) Store.deletePhoto(removed);
+        renderDraftPhotos();
+      });
+      fig.appendChild(del);
+      box.appendChild(fig);
+    });
+    var max = PHOTOS.maxPerPoint || 6;
+    $("#poi-photo-add").hidden = draftPhotos.length >= max;
+    $("#poi-photo-count").textContent = draftPhotos.length
+      ? draftPhotos.length + " de " + max : "";
+  }
+
+  function addPhotoFiles(files) {
+    var max = PHOTOS.maxPerPoint || 6;
+    var list = Array.prototype.slice.call(files);
+    if (!list.length) return;
+    var libres = max - draftPhotos.length;
+    if (libres <= 0) { toast("Máximo " + max + " fotos por punto."); return; }
+    if (list.length > libres) { list = list.slice(0, libres); toast("Solo caben " + libres + " fotos más."); }
+
+    photosBusy += list.length;
+    updatePhotoBusy();
+    list.forEach(function (file) {
+      compressImage(file)
+        .then(function (blob) { return Store.uploadPhoto(blob, editingId || draftId()); })
+        .then(function (photo) {
+          draftPhotos.push(photo);
+          renderDraftPhotos();
+        })
+        .catch(function (err) {
+          if (window.console) console.warn("[Rastro] foto:", err);
+          toast("No se pudo añadir una foto.");
+        })
+        .then(function () { photosBusy--; updatePhotoBusy(); });
+    });
+  }
+  function updatePhotoBusy() {
+    var n = $("#poi-photo-busy");
+    if (n) n.hidden = photosBusy <= 0;
+    var submit = document.querySelector("#editor-form button[type=submit]");
+    if (submit) submit.disabled = photosBusy > 0;
+  }
+  // Id provisional para agrupar las fotos de un punto aún sin guardar.
+  var pendingDraftId = null;
+  function draftId() {
+    if (!pendingDraftId) pendingDraftId = uid();
+    return pendingDraftId;
   }
 
   // --- Editor -------------------------------------------------------------
@@ -392,15 +508,33 @@
     if (p) setStars(p.stars || 0);
     setStatus(p ? (p.status || DEFAULT_STATUS) : DEFAULT_STATUS);
     draft = { lat: lat, lng: lng };
+    pendingDraftId = id || null;
+    draftPhotos = p && p.photos ? p.photos.slice() : [];
+    initialPhotos = draftPhotos.slice();   // para poder descartar las nuevas al cancelar
+    photosBusy = 0;
+    if (PHOTOS.enabled) { renderDraftPhotos(); updatePhotoBusy(); }
+    var pf = $("#poi-photos-field"); if (pf) pf.hidden = !PHOTOS.enabled;
     $("#poi-coords").textContent = "📍 " + lat.toFixed(5) + ", " + lng.toFixed(5);
     $("#poi-delete").hidden = !p;
     $("#editor-backdrop").hidden = false;
     $("#editor").hidden = false;
     setTimeout(function () { $("#poi-name").focus(); }, 30);
   }
-  function closeEditor() {
+  // Al cerrar sin guardar, las fotos subidas en esta sesión de edición se
+  // descartan para que no queden ocupando espacio sin pertenecer a nada.
+  function discardNewPhotos() {
+    if (!Store.deletePhoto) return;
+    var previas = {};
+    initialPhotos.forEach(function (ph) { if (ph && ph.url) previas[ph.url] = true; });
+    draftPhotos.forEach(function (ph) {
+      if (ph && ph.path && !previas[ph.url]) Store.deletePhoto(ph);
+    });
+  }
+  function closeEditor(saved) {
+    if (!saved) discardNewPhotos();
     $("#editor").hidden = true; $("#editor-backdrop").hidden = true;
     editingId = null; draft = null;
+    draftPhotos = []; initialPhotos = []; pendingDraftId = null;
   }
   function submitEditor(e) {
     e.preventDefault();
@@ -408,20 +542,23 @@
     if (!name) { $("#poi-name").focus(); return; }
     var data = {
       name: name, cat: $("#poi-cat").value, stars: draftStars,
-      status: draftStatus, notes: $("#poi-notes").value.trim()
+      status: draftStatus, notes: $("#poi-notes").value.trim(),
+      photos: draftPhotos.slice()
     };
     if (editingId) {
       var id = editingId;
       var updated = Object.assign({}, pointById(id), data); // punto completo (para la nube)
       Store.update(id, updated).then(function () {
         var p = pointById(id); if (p) Object.assign(p, data);
-        refresh(); closeEditor(); toast("Punto actualizado.");
+        refresh(); closeEditor(true); toast("Punto actualizado.");
       }).catch(function () { toast("No se pudo guardar."); });
     } else {
-      var np = Object.assign({ id: uid(), lat: draft.lat, lng: draft.lng, created: Date.now() }, data);
+      // Se reutiliza el id provisional para que las fotos ya subidas queden
+      // en la carpeta de este punto.
+      var np = Object.assign({ id: pendingDraftId || uid(), lat: draft.lat, lng: draft.lng, created: Date.now() }, data);
       Store.create(np).then(function () {
         points.push(np);
-        closeEditor();
+        closeEditor(true);
         toast(viewMode === "all" ? "Guardado en tus puntos." : "Punto guardado.");
         refresh();
       }).catch(function () { toast("No se pudo guardar."); });
@@ -839,12 +976,24 @@
       b.addEventListener("click", function () { setViewMode(b.dataset.mode); });
     });
 
+    if (PHOTOS.enabled) {
+      $("#poi-photo-add").addEventListener("click", function () { $("#poi-photo-input").click(); });
+      $("#poi-photo-input").addEventListener("change", function () {
+        if (this.files && this.files.length) addPhotoFiles(this.files);
+        this.value = "";
+      });
+    } else {
+      var pf0 = $("#poi-photos-field"); if (pf0) pf0.hidden = true;
+    }
+
     $("#editor-form").addEventListener("submit", submitEditor);
-    $("#editor-close").addEventListener("click", closeEditor);
-    $("#poi-cancel").addEventListener("click", closeEditor);
-    $("#editor-backdrop").addEventListener("click", closeEditor);
+    // Se envuelven: pasar closeEditor directamente le colaría el evento de
+    // clic como argumento "saved" y no descartaría las fotos nuevas.
+    $("#editor-close").addEventListener("click", function () { closeEditor(); });
+    $("#poi-cancel").addEventListener("click", function () { closeEditor(); });
+    $("#editor-backdrop").addEventListener("click", function () { closeEditor(); });
     $("#poi-delete").addEventListener("click", function () {
-      if (editingId && confirm("¿Eliminar este punto?")) { deletePoint(editingId); closeEditor(); }
+      if (editingId && confirm("¿Eliminar este punto?")) { deletePoint(editingId); closeEditor(true); }
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {

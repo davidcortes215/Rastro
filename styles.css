@@ -401,6 +401,43 @@ select.field-input { cursor: pointer; }
 .toggle + .toggle { border-left: 1px solid var(--line-strong); }
 .toggle[aria-checked="true"] { background: var(--negro); color: var(--blanco); }
 
+/* Fotos en el editor */
+.photos { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.photos:empty { display: none; }
+.photo-thumb {
+  position: relative; width: 74px; height: 74px;
+  border-radius: var(--r-sm); overflow: hidden;
+  border: 1px solid var(--line); background: var(--surface-3);
+}
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-del {
+  position: absolute; top: 3px; right: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  border: none; background: rgba(20, 20, 24, 0.72); color: #fff;
+  font-size: 0.95rem; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+.photo-del:hover { background: var(--accent); }
+.photo-actions { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; }
+.photo-add {
+  background: var(--surface-2); border: 1px dashed var(--line-strong);
+  border-radius: var(--r-sm); padding: 0.45rem 0.75rem;
+  font-size: 0.83rem; color: var(--ink-soft);
+}
+.photo-add:hover { border-color: var(--accent); color: var(--accent); }
+.photo-busy { font-size: 0.8rem; color: var(--ink-faint); }
+.photo-count { font-family: var(--mono); font-size: 0.66rem; color: var(--ink-faint); text-transform: none; }
+
+/* Fotos en el globo del mapa y en la lista */
+.popup-photos { display: flex; gap: 4px; margin-bottom: 0.5rem; overflow-x: auto; }
+.popup-photos img {
+  width: 84px; height: 62px; object-fit: cover;
+  border-radius: 6px; flex: 0 0 auto; background: var(--surface-3);
+}
+.poi-card-photo {
+  width: 34px; height: 34px; object-fit: cover; border-radius: 6px;
+  flex: 0 0 auto; border: 1px solid var(--line);
+}
+
 .coords { font-family: var(--mono); font-size: 0.68rem; color: var(--ink-faint); }
 
 .editor-foot { display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.2rem; border-top: 1px solid var(--line); gap: 0.5rem; background: var(--surface-2); }

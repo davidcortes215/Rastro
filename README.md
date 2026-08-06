@@ -28,6 +28,9 @@ servidor propio en esta primera fase.
   centrarse en la ubicación del usuario; si no, muestra la vista configurada.
 - **Puntos de interés** por categorías, con marcador de color y emoji.
 - **Valoración** de 1 a 5 estrellas, **estado** (visitado / pendiente) y **notas**.
+- **Fotos** por punto (hasta 6). Se reescalan y comprimen en el navegador
+  antes de subirlas; en modo nube van a Supabase Storage y en modo local
+  quedan incrustadas en el navegador.
 - **Filtros combinables**: búsqueda por texto, categorías, valoración mínima y estado.
 - **Buscador de lugares** (geocodificación) para localizar un sitio y guardarlo.
 - **Exportar / importar** los datos en JSON (copia de seguridad y traspaso de dispositivo).
@@ -134,6 +137,31 @@ Store.replaceAll(points)  // → Promise<void>
    activo si prefieres verificar el correo en producción.
 4. En **Project Settings → API**, copia **Project URL** y la clave **anon
    public**, y pégalas en `config.js` → `cloud.url` y `cloud.anonKey`.
+
+5. Para las **fotos**, crea el depósito de Storage y sus permisos ejecutando
+   también este SQL:
+
+   ```sql
+   insert into storage.buckets (id, name, public)
+   values ('fotos', 'fotos', true)
+   on conflict (id) do nothing;
+
+   drop policy if exists "fotos_lectura" on storage.objects;
+   create policy "fotos_lectura" on storage.objects for select
+     using (bucket_id = 'fotos');
+
+   drop policy if exists "fotos_subir_propias" on storage.objects;
+   create policy "fotos_subir_propias" on storage.objects for insert
+     with check (bucket_id = 'fotos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+   drop policy if exists "fotos_borrar_propias" on storage.objects;
+   create policy "fotos_borrar_propias" on storage.objects for delete
+     using (bucket_id = 'fotos' and (storage.foldername(name))[1] = auth.uid()::text);
+   ```
+
+   Cada usuario solo puede subir y borrar dentro de su propia carpeta
+   (`{user_id}/{punto}/...`). El depósito es de lectura pública, que es lo
+   que permite mostrar las fotos con una URL directa.
 
 Las claves `anon` son **públicas por diseño**: la seguridad la garantizan las
 políticas RLS (cada usuario solo accede a sus filas). Para volver al modo local,

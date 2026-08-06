@@ -62,7 +62,18 @@
     replaceAll: function (list) {
       if (!write(Array.isArray(list) ? list : [])) return Promise.reject(new Error("storage-full"));
       return Promise.resolve();
-    }
+    },
+    // Sin nube la foto se guarda incrustada en el propio navegador. Ya viene
+    // comprimida, pero el almacenamiento local es limitado (unos pocos MB).
+    uploadPhoto: function (blob) {
+      return new Promise(function (resolve, reject) {
+        var fr = new FileReader();
+        fr.onload = function () { resolve({ url: fr.result, path: null }); };
+        fr.onerror = function () { reject(new Error("read")); };
+        fr.readAsDataURL(blob);
+      });
+    },
+    deletePhoto: function () { return Promise.resolve(); }
   };
 
   window.LocalStore = LocalStore;

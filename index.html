@@ -159,6 +159,18 @@
           <span class="label">Estado</span>
           <div class="toggle-group" id="poi-status" role="radiogroup" aria-label="Estado"></div>
         </div>
+        <div class="field" id="poi-photos-field">
+          <span class="label">Fotos <span class="photo-count" id="poi-photo-count"></span></span>
+          <div class="photos" id="poi-photos"></div>
+          <div class="photo-actions">
+            <button type="button" class="photo-add" id="poi-photo-add">
+              <span aria-hidden="true">＋</span> Añadir foto
+            </button>
+            <span class="photo-busy" id="poi-photo-busy" hidden>Procesando…</span>
+          </div>
+          <input type="file" id="poi-photo-input" accept="image/*" multiple hidden>
+        </div>
+
         <div class="field">
           <label class="label" for="poi-notes">Impresiones</label>
           <textarea class="field-input" id="poi-notes" rows="4" maxlength="2000" placeholder="¿Qué te pareció? Qué probaste, con quién fuiste, cuándo volver…"></textarea>

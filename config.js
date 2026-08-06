@@ -26,7 +26,16 @@ window.APP_CONFIG = {
   cloud: {
     provider: "supabase",
     url: "https://mbeulgxttoqzrumfqzej.supabase.co",
-    anonKey: "sb_publishable_yTVfhyC6HXVZmw2xSAW5Uw_H6G75s6M"
+    anonKey: "sb_publishable_yTVfhyC6HXVZmw2xSAW5Uw_H6G75s6M",
+    photoBucket: "fotos"   // depósito de Supabase Storage donde van las fotos
+  },
+
+  /* Fotos de cada punto ---------------------------------------------------- */
+  photos: {
+    enabled: true,
+    maxPerPoint: 6,
+    maxSize: 1600,      // lado mayor en píxeles tras comprimir
+    quality: 0.72       // calidad JPEG (0-1)
   },
 
   /* Mapa ------------------------------------------------------------------- */
