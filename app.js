@@ -451,37 +451,53 @@
     var b = map.getBounds();
     var bbox = b.getSouth().toFixed(5) + "," + b.getWest().toFixed(5) + "," +
                b.getNorth().toFixed(5) + "," + b.getEast().toFixed(5);
-    var body = "[out:json][timeout:20];(";
-    selectors.forEach(function (sel) { body += "nwr" + sel + "(" + bbox + ");"; });
-    body += ");out center " + (DISCOVER.maxResults || 250) + ";";
+    var timeout = DISCOVER.queryTimeout || 25;
+    var query = "[out:json][timeout:" + timeout + "];(";
+    selectors.forEach(function (sel) { query += "nwr" + sel + "(" + bbox + ");"; });
+    query += ");out center " + (DISCOVER.maxResults || 250) + ";";
 
     var seq = ++discoverSeq;
     var servers = overpassEndpoints();
+    var lastError = "";
     setDiscoverStatus("Buscando sitios…");
 
-    // Prueba los servidores en orden hasta que uno responda.
+    // Prueba los servidores en orden hasta que uno responda. Se distingue el
+    // tipo de fallo: un 400 significa consulta mal formada (reintentar en otro
+    // servidor no sirve de nada), mientras que 429/504 sí son saturación.
     function attempt(i) {
       if (seq !== discoverSeq) return;               // hay una búsqueda más nueva
-      if (i >= servers.length) {                     // se agotaron todos
-        setDiscoverStatus("Los servidores de OpenStreetMap están saturados.", true);
+      if (i >= servers.length) {
+        setDiscoverStatus("No se pudieron cargar los sitios (" + (lastError || "sin respuesta") + ").", true);
         return;
       }
       if (i > 0) setDiscoverStatus("Servidor ocupado, probando otro…");
+
       fetch(servers[i], {
         method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: body
+        // Formato canónico de Overpass: más compatible que enviar el texto plano.
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "data=" + encodeURIComponent(query)
       }).then(function (r) {
-        if (!r.ok) throw new Error("overpass " + r.status);
+        if (!r.ok) {
+          var e = new Error("HTTP " + r.status);
+          e.status = r.status;
+          throw e;
+        }
         return r.json();
       }).then(function (data) {
         if (seq !== discoverSeq) return;
         discovered = parseOverpass(data);
         renderMarkers(); renderList();
         setDiscoverStatus(discovered.length
-          ? discovered.length + " sitios en esta zona"
+          ? discovered.length + (discovered.length === 1 ? " sitio" : " sitios") + " en esta zona"
           : "Sin sitios de estas categorías aquí.");
-      }).catch(function () {
+      }).catch(function (err) {
+        lastError = err && err.status ? ("error " + err.status) : "sin conexión";
+        if (window.console) console.warn("[Rastro] Overpass falló:", servers[i], lastError, err);
+        if (err && err.status === 400) {           // consulta inválida: no insistir
+          setDiscoverStatus("La consulta no es válida (error 400).", true);
+          return;
+        }
         attempt(i + 1);
       });
     }

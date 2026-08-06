@@ -59,11 +59,12 @@ window.APP_CONFIG = {
     // Servidores Overpass, en orden de preferencia. Los públicos se saturan
     // a menudo: si uno falla, la app prueba el siguiente automáticamente.
     overpassEndpoints: [
-      "https://overpass.kumi.systems/api/interpreter",
       "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
       "https://overpass.private.coffee/api/interpreter",
-      "https://overpass.osm.jp/api/interpreter"
+      "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
     ],
+    queryTimeout: 25,   // segundos que se le conceden al servidor
     minZoom: 12,        // por debajo de este zoom no se consulta (demasiada área)
     maxResults: 250,    // tope de resultados por consulta
     // Etiquetas de OSM que se consultan para cada categoría. Las categorías
