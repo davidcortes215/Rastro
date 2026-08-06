@@ -23,8 +23,9 @@ servidor propio en esta primera fase.
   - **Todos (España)** → sitios reales de OpenStreetMap en la zona que estás
     viendo (restaurantes, miradores, faros, playas, pueblos…), que puedes
     **guardar en los tuyos** con un clic para valorarlos y anotarlos.
-- **Mapa** con Leaflet + teselas de OpenStreetMap. Al abrir intenta centrarse
-  en la ubicación del usuario; si no hay permiso, muestra la vista configurada.
+- **Mapa** con Leaflet y **5 estilos** a elegir (Callejero, Minimalista,
+  Relieve, Satélite y OSM clásico); la elección se recuerda. Al abrir intenta
+  centrarse en la ubicación del usuario; si no, muestra la vista configurada.
 - **Puntos de interés** por categorías, con marcador de color y emoji.
 - **Valoración** de 1 a 5 estrellas, **estado** (visitado / pendiente) y **notas**.
 - **Filtros combinables**: búsqueda por texto, categorías, valoración mínima y estado.

@@ -21,7 +21,7 @@
   var points = [];          // tus puntos (owned), fuente de verdad: Store
   var discovered = [];       // sitios de OSM en la zona (transitorios)
   var viewMode = "mine";     // "mine" | "all"
-  var map, markersLayer, markerById = {};
+  var map, markersLayer, markerById = {}, tileLayer = null, currentStyleId = null;
   var addMode = false;
   var editingId = null;
   var draft = null;
@@ -101,13 +101,74 @@
   }
 
   // --- Mapa ---------------------------------------------------------------
+  function mapStyles() {
+    if (CFG.map.styles && CFG.map.styles.length) return CFG.map.styles;
+    // Compatibilidad con configuraciones antiguas que solo tenían "tiles".
+    var t = CFG.map.tiles || {};
+    return [{ id: "base", label: "Mapa", url: t.url, maxZoom: t.maxZoom, attribution: t.attribution }];
+  }
+  function styleStorageKey() { return (CFG.storageKey || "rastro") + ":estilo"; }
+  function savedStyleId() {
+    try { return localStorage.getItem(styleStorageKey()); } catch (e) { return null; }
+  }
+  function applyMapStyle(id) {
+    var list = mapStyles();
+    var st = null;
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) { st = list[i]; break; }
+    if (!st) st = list[0];
+    if (tileLayer) map.removeLayer(tileLayer);
+    tileLayer = L.tileLayer(st.url, {
+      maxZoom: st.maxZoom || 19,
+      subdomains: st.subdomains || "abc",
+      detectRetina: !!st.retina,
+      attribution: st.attribution || ""
+    }).addTo(map);
+    if (tileLayer.bringToBack) tileLayer.bringToBack();
+    if (map.setMaxZoom) map.setMaxZoom(st.maxZoom || 19);
+    currentStyleId = st.id;
+    try { localStorage.setItem(styleStorageKey(), st.id); } catch (e) {}
+    updateStyleUI();
+  }
+  function buildStyleControl() {
+    var list = mapStyles();
+    var box = $("#map-styles");
+    if (!box) return;
+    if (list.length < 2) { box.hidden = true; return; }
+    var ul = $("#map-styles-list");
+    ul.innerHTML = "";
+    list.forEach(function (st) {
+      var b = el("button", "map-style-opt", st.label);
+      b.type = "button"; b.dataset.style = st.id;
+      b.addEventListener("click", function () {
+        applyMapStyle(st.id);
+        ul.hidden = true;
+        $("#map-styles-toggle").setAttribute("aria-expanded", "false");
+      });
+      ul.appendChild(b);
+    });
+    $("#map-styles-toggle").addEventListener("click", function () {
+      var open = ul.hidden;
+      ul.hidden = !open;
+      this.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.addEventListener("click", function (e) {
+      if (!box.contains(e.target)) {
+        ul.hidden = true;
+        $("#map-styles-toggle").setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+  function updateStyleUI() {
+    document.querySelectorAll("#map-styles-list .map-style-opt").forEach(function (b) {
+      b.classList.toggle("is-on", b.dataset.style === currentStyleId);
+    });
+  }
+
   function initMap() {
     var m = CFG.map;
     map = L.map("map", { zoomControl: true }).setView(m.center, m.zoom);
-    L.tileLayer(m.tiles.url, {
-      maxZoom: m.tiles.maxZoom || 19,
-      attribution: m.tiles.attribution || ""
-    }).addTo(map);
+    buildStyleControl();
+    applyMapStyle(savedStyleId() || m.defaultStyle || mapStyles()[0].id);
     markersLayer = L.layerGroup().addTo(map);
 
     map.on("click", function (e) {
@@ -405,6 +466,13 @@
   // Los servidores Overpass públicos se saturan con frecuencia y responden
   // 429/504. Por eso se prueban varios en orden hasta que uno conteste.
   var discoverTimer, discoverSeq = 0;
+  // Última descarga: permite reutilizar resultados al mover o acercar el mapa
+  // dentro de la zona ya consultada, en vez de volver a pedirlos al servidor.
+  var lastFetch = null;
+  function countText(n) {
+    return n ? n + (n === 1 ? " sitio" : " sitios") + " en esta zona"
+             : "Sin sitios de estas categorías aquí.";
+  }
   function overpassEndpoints() {
     if (DISCOVER.overpassEndpoints && DISCOVER.overpassEndpoints.length) return DISCOVER.overpassEndpoints;
     return [DISCOVER.overpassEndpoint || "https://overpass-api.de/api/interpreter"];
@@ -448,9 +516,26 @@
       setDiscoverStatus("Selecciona alguna categoría para buscar.");
       return;
     }
-    var b = map.getBounds();
-    var bbox = b.getSouth().toFixed(5) + "," + b.getWest().toFixed(5) + "," +
-               b.getNorth().toFixed(5) + "," + b.getEast().toFixed(5);
+    var view = map.getBounds();
+    var sig = selectors.join("|");
+    var ttl = (DISCOVER.cacheMinutes || 10) * 60000;
+
+    // Si la vista actual cabe dentro de lo ya descargado (y con las mismas
+    // categorías), se reutiliza: instantáneo y sin molestar al servidor.
+    if (lastFetch && lastFetch.sig === sig &&
+        (Date.now() - lastFetch.ts) < ttl &&
+        lastFetch.bounds.contains(view)) {
+      discovered = lastFetch.items;
+      renderMarkers(); renderList();
+      setDiscoverStatus(countText(discovered.length));
+      return;
+    }
+
+    // Se pide un área mayor que la visible para que los desplazamientos
+    // pequeños queden cubiertos por la caché.
+    var area = view.pad(DISCOVER.padding == null ? 0.35 : DISCOVER.padding);
+    var bbox = area.getSouth().toFixed(5) + "," + area.getWest().toFixed(5) + "," +
+               area.getNorth().toFixed(5) + "," + area.getEast().toFixed(5);
     var timeout = DISCOVER.queryTimeout || 25;
     var query = "[out:json][timeout:" + timeout + "];(";
     selectors.forEach(function (sel) { query += "nwr" + sel + "(" + bbox + ");"; });
@@ -487,10 +572,9 @@
       }).then(function (data) {
         if (seq !== discoverSeq) return;
         discovered = parseOverpass(data);
+        lastFetch = { sig: sig, ts: Date.now(), bounds: area, items: discovered };
         renderMarkers(); renderList();
-        setDiscoverStatus(discovered.length
-          ? discovered.length + (discovered.length === 1 ? " sitio" : " sitios") + " en esta zona"
-          : "Sin sitios de estas categorías aquí.");
+        setDiscoverStatus(countText(discovered.length));
       }).catch(function (err) {
         lastError = err && err.status ? ("error " + err.status) : "sin conexión";
         if (window.console) console.warn("[Rastro] Overpass falló:", servers[i], lastError, err);

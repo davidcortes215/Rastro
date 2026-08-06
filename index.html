@@ -113,6 +113,17 @@
       <div class="map-wrap">
         <div id="map"></div>
         <div class="map-empty" id="map-empty" hidden></div>
+
+        <div class="map-styles" id="map-styles">
+          <button type="button" class="map-styles-toggle" id="map-styles-toggle"
+                  aria-label="Cambiar estilo de mapa" aria-expanded="false" title="Estilo de mapa">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+              <path d="M12 3.5 3 8l9 4.5L21 8l-9-4.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M3.5 12.5 12 16.8l8.5-4.3M3.5 16.5 12 20.8l8.5-4.3" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="map-styles-list" id="map-styles-list" hidden></div>
+        </div>
         <div class="discover-status" id="discover-status" hidden></div>
         <div class="map-hint" id="map-hint" hidden>
           <span>Toca el mapa donde quieras colocar el punto</span>

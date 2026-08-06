@@ -34,11 +34,42 @@ window.APP_CONFIG = {
     center: [40.0, -3.7],           // vista inicial [lat, lng]
     zoom: 6,
     tryGeolocateOnLoad: true,       // intentar centrar en la ubicación del usuario
-    tiles: {
-      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19
-    },
+    /* Estilos de mapa disponibles. El usuario elige con el botón de capas y
+       su elección se recuerda. Todos son gratuitos y sin clave de API; hay
+       que conservar su atribución. Para quitar alguno, bórralo de la lista. */
+    defaultStyle: "voyager",
+    styles: [
+      {
+        id: "voyager", label: "Callejero",
+        url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        subdomains: "abcd", maxZoom: 20, retina: true,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      },
+      {
+        id: "minimal", label: "Minimalista",
+        url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        subdomains: "abcd", maxZoom: 20, retina: true,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      },
+      {
+        id: "relieve", label: "Relieve",
+        url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+        subdomains: "abc", maxZoom: 17,
+        attribution: 'Datos &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Cartografía &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
+      },
+      {
+        id: "satelite", label: "Satélite",
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        maxZoom: 19,
+        attribution: 'Imágenes &copy; Esri, Maxar, Earthstar Geographics'
+      },
+      {
+        id: "osm", label: "OSM clásico",
+        url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        subdomains: "abc", maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }
+    ],
     /* Buscador de lugares (geocodificación). enabled:false lo oculta.
        Nominatim es gratuito pero con límite de uso; para producción con
        volumen, apunta endpoint a tu propio servicio de geocodificación. */
@@ -65,6 +96,8 @@ window.APP_CONFIG = {
       "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
     ],
     queryTimeout: 25,   // segundos que se le conceden al servidor
+    padding: 0.35,      // margen extra que se descarga alrededor de lo visible
+    cacheMinutes: 10,   // tiempo que se reutiliza lo ya descargado
     minZoom: 12,        // por debajo de este zoom no se consulta (demasiada área)
     maxResults: 250,    // tope de resultados por consulta
     // Etiquetas de OSM que se consultan para cada categoría. Las categorías
