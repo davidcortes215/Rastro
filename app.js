@@ -606,9 +606,10 @@
   // Última descarga: permite reutilizar resultados al mover o acercar el mapa
   // dentro de la zona ya consultada, en vez de volver a pedirlos al servidor.
   var lastFetch = null;
-  function countText(n) {
-    return n ? n + (n === 1 ? " sitio" : " sitios") + " en esta zona"
-             : "Sin sitios de estas categorías aquí.";
+  function countText(n, truncated) {
+    if (!n) return "Sin sitios de estas categorías aquí.";
+    return n + (n === 1 ? " sitio" : " sitios") +
+      (truncated ? " · hay más, acércate para verlos" : " en esta zona");
   }
   function overpassEndpoints() {
     if (DISCOVER.overpassEndpoints && DISCOVER.overpassEndpoints.length) return DISCOVER.overpassEndpoints;
@@ -659,12 +660,16 @@
 
     // Si la vista actual cabe dentro de lo ya descargado (y con las mismas
     // categorías), se reutiliza: instantáneo y sin molestar al servidor.
+    // Salvo que aquella descarga tocara el tope de resultados: en ese caso
+    // solo trajo una parte de los sitios, así que al acercarse hay que
+    // volver a preguntar para ver los de la zona concreta.
     if (lastFetch && lastFetch.sig === sig &&
         (Date.now() - lastFetch.ts) < ttl &&
+        !lastFetch.truncated &&
         lastFetch.bounds.contains(view)) {
       discovered = lastFetch.items;
       renderMarkers(); renderList();
-      setDiscoverStatus(countText(discovered.length));
+      setDiscoverStatus(countText(discovered.length, false));
       return;
     }
 
@@ -709,9 +714,13 @@
       }).then(function (data) {
         if (seq !== discoverSeq) return;
         discovered = parseOverpass(data);
-        lastFetch = { sig: sig, ts: Date.now(), bounds: area, items: discovered };
+        // El servidor corta en maxResults: si vino lleno, hay más sitios que
+        // no han llegado y estos resultados no valen para acercarse.
+        var recibidos = (data && data.elements && data.elements.length) || 0;
+        var truncated = recibidos >= (DISCOVER.maxResults || 250);
+        lastFetch = { sig: sig, ts: Date.now(), bounds: area, items: discovered, truncated: truncated };
         renderMarkers(); renderList();
-        setDiscoverStatus(countText(discovered.length));
+        setDiscoverStatus(countText(discovered.length, truncated));
       }).catch(function (err) {
         lastError = err && err.status ? ("error " + err.status) : "sin conexión";
         if (window.console) console.warn("[Rastro] Overpass falló:", servers[i], lastError, err);
