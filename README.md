@@ -32,6 +32,9 @@ servidor propio en esta primera fase.
   antes de subirlas; en modo nube van a Supabase Storage y en modo local
   quedan incrustadas en el navegador.
 - **Filtros combinables**: búsqueda por texto, categorías, valoración mínima y estado.
+- **Ordenación** por valoración, **cercanía**, nombre o fecha de alta. Al ordenar
+  por cercanía se muestra la distancia a cada sitio, medida desde la ubicación
+  del usuario o, si no da permiso, desde el centro del mapa.
 - **Buscador de lugares** (geocodificación) para localizar un sitio y guardarlo.
 - **Exportar / importar** los datos en JSON (copia de seguridad y traspaso de dispositivo).
 - **Instalable como app** (PWA): se añade a la pantalla de inicio, se abre a

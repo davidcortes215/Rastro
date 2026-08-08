@@ -31,6 +31,9 @@
   var filters = { text: "", cats: {}, rating: 0, status: "todos" };
   CATEGORIES.forEach(function (c) { filters.cats[c.id] = true; });
 
+  var sortBy = "valoracion";   // valoracion | cercania | nombre | recientes
+  var userPos = null;          // última ubicación conocida del usuario
+
   // --- Utilidades ---------------------------------------------------------
   function $(sel) { return document.querySelector(sel); }
   function el(tag, cls, text) {
@@ -48,6 +51,34 @@
   function statusLabel(id) {
     var s = CFG.statuses.filter(function (x) { return x.id === id; })[0];
     return s ? s.label : id;
+  }
+
+  // --- Distancias ----------------------------------------------------------
+  // Fórmula del semiverseno: distancia en metros sobre la superficie terrestre.
+  function distanciaM(lat1, lng1, lat2, lng2) {
+    var R = 6371000;
+    var t = Math.PI / 180;
+    var dLat = (lat2 - lat1) * t, dLng = (lng2 - lng1) * t;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * t) * Math.cos(lat2 * t) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  function formatoDistancia(m) {
+    if (m < 1000) return Math.round(m / 10) * 10 + " m";
+    var km = m / 1000;
+    return (km < 10 ? km.toFixed(1).replace(".", ",") : Math.round(km)) + " km";
+  }
+  // Referencia para medir: la ubicación del usuario y, si no la hay, el
+  // centro del mapa (así la función sirve aunque no dé permiso).
+  function posReferencia() {
+    if (userPos) return userPos;
+    if (map) { var c = map.getCenter(); return { lat: c.lat, lng: c.lng }; }
+    return null;
+  }
+  function distanciaDe(p) {
+    var ref = posReferencia();
+    if (!ref) return null;
+    return distanciaM(ref.lat, ref.lng, p.lat, p.lng);
   }
 
   var toastTimer;
@@ -174,11 +205,18 @@
     map.on("click", function (e) {
       if (addMode) { openEditor(null, e.latlng.lat, e.latlng.lng); setAddMode(false); }
     });
-    map.on("moveend", function () { if (viewMode === "all") scheduleDiscover(); });
+    map.on("moveend", function () {
+      if (viewMode === "all") scheduleDiscover();
+      // Sin ubicación propia la referencia es el centro del mapa: al moverlo
+      // cambian las distancias, así que hay que reordenar.
+      if (sortBy === "cercania" && !userPos) renderList();
+    });
 
     if (m.tryGeolocateOnLoad && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function (pos) {
-        map.setView([pos.coords.latitude, pos.coords.longitude], 13, { animate: true });
+        userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        map.setView([userPos.lat, userPos.lng], 13, { animate: true });
+        renderList();   // ya se pueden mostrar distancias
       }, function () {}, { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 });
     }
   }
@@ -280,9 +318,7 @@
   function renderList() {
     var ul = $("#poi-list");
     ul.innerHTML = "";
-    var visible = filteredItems().slice().sort(function (a, b) {
-      return (b.stars || 0) - (a.stars || 0) || a.name.localeCompare(b.name);
-    });
+    var visible = ordenar(filteredItems().slice());
     $("#count-visible").textContent = visible.length;
     $("#count-total").textContent = activeSet().length;
     $("#btn-reset-filters").hidden = !filtersActive();
@@ -323,12 +359,54 @@
         meta.appendChild(el("span", "poi-card-stars", starsText(p.stars)));
         meta.appendChild(el("span", "poi-card-cat", c.label));
       }
+      // La distancia se muestra si sabemos dónde está el usuario, o siempre
+      // que se esté ordenando por cercanía (midiendo desde el centro del mapa).
+      if (userPos || sortBy === "cercania") {
+        var d = distanciaDe(p);
+        if (d != null) meta.appendChild(el("span", "poi-card-dist", formatoDistancia(d)));
+      }
       li.appendChild(meta);
       if (p.notes) li.appendChild(el("div", "poi-card-notes", p.notes));
       li.addEventListener("click", function () { focusItem(p.id); });
       ul.appendChild(li);
     });
   }
+  function sortStorageKey() { return (CFG.storageKey || "rastro") + ":orden"; }
+
+  // Al ordenar por cercanía se pide la ubicación; si no hay permiso se mide
+  // desde el centro del mapa, avisando de ello.
+  function pedirUbicacion() {
+    if (!navigator.geolocation) {
+      toast("Sin ubicación: se mide desde el centro del mapa.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      renderList();
+    }, function () {
+      toast("Sin permiso de ubicación: se mide desde el centro del mapa.");
+    }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+  }
+
+  function ordenar(lista) {
+    if (sortBy === "cercania") {
+      var ref = posReferencia();
+      if (ref) {
+        lista.forEach(function (p) { p._d = distanciaM(ref.lat, ref.lng, p.lat, p.lng); });
+        return lista.sort(function (a, b) { return a._d - b._d; });
+      }
+    }
+    if (sortBy === "nombre") {
+      return lista.sort(function (a, b) { return a.name.localeCompare(b.name, "es"); });
+    }
+    if (sortBy === "recientes") {
+      return lista.sort(function (a, b) { return (b.created || 0) - (a.created || 0); });
+    }
+    return lista.sort(function (a, b) {   // valoración (por defecto)
+      return (b.stars || 0) - (a.stars || 0) || a.name.localeCompare(b.name, "es");
+    });
+  }
+
   function emptyState(title, sub) {
     var d = el("div", "poi-empty");
     d.appendChild(el("div", null, title));
@@ -976,7 +1054,9 @@
       if (!navigator.geolocation) { toast("Geolocalización no disponible."); return; }
       toast("Buscando tu ubicación…");
       navigator.geolocation.getCurrentPosition(function (pos) {
-        map.setView([pos.coords.latitude, pos.coords.longitude], 14, { animate: true });
+        userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        map.setView([userPos.lat, userPos.lng], 14, { animate: true });
+        renderList();
       }, function () { toast("No se pudo obtener tu ubicación."); },
       { enableHighAccuracy: true, timeout: 8000 });
     });
@@ -1014,6 +1094,13 @@
     $("#filter-text").addEventListener("input", function () { filters.text = this.value; refresh(); });
     $("#filter-rating").addEventListener("change", function () { filters.rating = parseInt(this.value, 10) || 0; refresh(); });
     $("#filter-status").addEventListener("change", function () { filters.status = this.value; refresh(); });
+
+    $("#sort-by").addEventListener("change", function () {
+      sortBy = this.value;
+      try { localStorage.setItem(sortStorageKey(), sortBy); } catch (e) {}
+      if (sortBy === "cercania" && !userPos) pedirUbicacion();
+      renderList();
+    });
     $("#btn-reset-filters").addEventListener("click", resetFilters);
     $("#cats-toggle-all").addEventListener("click", function () {
       var anyOff = CATEGORIES.some(function (c) { return !filters.cats[c.id]; });
@@ -1076,6 +1163,13 @@
     buildStarInput();
     buildStatusInput();
     wireEvents();
+    try {
+      var orden = localStorage.getItem(sortStorageKey());
+      if (orden) { sortBy = orden; $("#sort-by").value = orden; }
+    } catch (e) {}
+    // Si al abrir ya está elegido "cercanía", hay que pedir la ubicación:
+    // de lo contrario se mediría en silencio desde el centro del mapa.
+    if (sortBy === "cercania") pedirUbicacion();
     if (window.innerWidth <= 720) $("#panel").classList.add("is-hidden");
   }
   function loadPoints() {

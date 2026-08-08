@@ -261,6 +261,10 @@ select.field-input { cursor: pointer; }
   background: var(--surface-3); padding: 0.12rem 0.4rem; border-radius: 4px;
 }
 .poi-card-pend { font-style: italic; color: var(--ink-faint); }
+.poi-card-dist {
+  margin-left: auto; color: var(--ink-soft); font-weight: 700;
+  white-space: nowrap; flex: 0 0 auto;
+}
 .poi-card-notes { margin-top: 0.4rem; padding-left: calc(26px + 0.55rem); font-size: 0.8rem; color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 .poi-empty { padding: 2.5rem 1.4rem; text-align: center; color: var(--ink-faint); font-size: 0.85rem; line-height: 1.6; }
