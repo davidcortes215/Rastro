@@ -49,7 +49,10 @@ rastro/
 ├── store.js            Capa de datos local (localStorage)
 ├── cloud.js            Registro/sesión + datos por usuario en la nube (Supabase)
 ├── app.js              Lógica de la aplicación
-├── favicon.svg         Icono
+├── icono-64.png        Icono de la pestaña del navegador
+├── icono-180.png       Icono al añadir a la pantalla de inicio (iOS)
+├── icono-192.png       Icono para la app instalable
+├── icono-512.png       Icono para la app instalable (alta resolución)
 ├── README.md
 └── .nojekyll           Para GitHub Pages
 ```
