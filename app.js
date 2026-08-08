@@ -636,6 +636,7 @@
       var np = Object.assign({ id: pendingDraftId || uid(), lat: draft.lat, lng: draft.lng, created: Date.now() }, data);
       Store.create(np).then(function () {
         points.push(np);
+        limpiarMarcadorBusqueda();   // ya es un punto tuyo: sobra el de búsqueda
         closeEditor(true);
         toast(viewMode === "all" ? "Guardado en tus puntos." : "Punto guardado.");
         refresh();
@@ -958,7 +959,14 @@
       return r.json();
     }).then(function (list) {
       return (list || []).map(function (x) {
-        return { lat: parseFloat(x.lat), lon: parseFloat(x.lon), label: x.display_name };
+        var etiquetas = {};
+        if (x.category && x.type) etiquetas[x.category] = x.type;
+        return {
+          lat: parseFloat(x.lat), lon: parseFloat(x.lon),
+          label: x.display_name,
+          name: x.name || String(x.display_name || "").split(",")[0].trim(),
+          cat: osmCategoryOf(etiquetas)
+        };
       });
     });
   }
@@ -981,10 +989,14 @@
       }).map(function (f) {
         var p = f.properties || {};
         var parts = [p.name, p.city || p.county, p.state, p.country].filter(Boolean);
+        var etiquetas = {};
+        if (p.osm_key && p.osm_value) etiquetas[p.osm_key] = p.osm_value;
         return {
           lat: f.geometry.coordinates[1],
           lon: f.geometry.coordinates[0],
-          label: parts.join(", ")
+          label: parts.join(", "),
+          name: p.name || parts[0] || "",
+          cat: osmCategoryOf(etiquetas)
         };
       });
     });
@@ -1035,12 +1047,56 @@
     ul.hidden = false;
   }
 
+  // Marcador del sitio buscado. Va suelto sobre el mapa (no en la capa de
+  // puntos) para que no lo borren los refrescos ni los filtros.
+  var searchMarker = null;
+  function limpiarMarcadorBusqueda() {
+    if (searchMarker) { map.removeLayer(searchMarker); searchMarker = null; }
+  }
+  function marcarResultado(item) {
+    limpiarMarcadorBusqueda();
+    var c = cat(item.cat);
+    var nombre = item.name || String(item.label || "").split(",")[0].trim();
+    searchMarker = L.marker([item.lat, item.lon], {
+      zIndexOffset: 1000,
+      icon: L.divIcon({
+        className: "",
+        html: '<div class="poi-pin is-search" style="background:' + c.color + '">' +
+              '<span>' + c.emoji + "</span></div>",
+        iconSize: [34, 34], iconAnchor: [17, 32], popupAnchor: [0, -30]
+      })
+    }).addTo(map);
+
+    searchMarker.bindPopup(
+      '<div class="popup popup-search">' +
+        '<div class="popup-name">' + escapeHtml(nombre) + "</div>" +
+        '<div class="popup-meta">' + escapeHtml(cat(item.cat).label) + " · resultado de búsqueda</div>" +
+        '<div class="popup-actions">' +
+          '<button type="button" data-act="save">＋ Guardar en mis puntos</button>' +
+          '<button type="button" data-act="close">Quitar</button>' +
+        "</div></div>");
+
+    searchMarker.on("popupopen", function () {
+      var nodo = document.querySelector('.popup-search');
+      if (!nodo) return;
+      nodo.querySelector('[data-act="save"]').onclick = function () {
+        map.closePopup();
+        openEditor(null, item.lat, item.lon, { name: nombre, cat: item.cat });
+      };
+      nodo.querySelector('[data-act="close"]').onclick = function () {
+        map.closePopup();
+        limpiarMarcadorBusqueda();
+      };
+    });
+    searchMarker.openPopup();
+  }
+
   function pickGeo(i) {
     var item = geoItems[i]; if (!item) return;
-    map.setView([item.lat, item.lon], 15, { animate: true });
+    map.setView([item.lat, item.lon], 17, { animate: true });
     $("#geosearch-results").hidden = true; $("#geosearch-input").value = "";
+    marcarResultado(item);
     if (viewMode === "all") scheduleDiscover();
-    else toast("¿Buen sitio? Pulsa “Añadir” para guardarlo.");
   }
 
   // --- Eventos ------------------------------------------------------------

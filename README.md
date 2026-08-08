@@ -35,7 +35,9 @@ servidor propio en esta primera fase.
 - **Ordenación** por valoración, **cercanía**, nombre o fecha de alta. Al ordenar
   por cercanía se muestra la distancia a cada sitio, medida desde la ubicación
   del usuario o, si no da permiso, desde el centro del mapa.
-- **Buscador de lugares** (geocodificación) para localizar un sitio y guardarlo.
+- **Buscador de lugares** (geocodificación): al elegir un resultado se marca en
+  el mapa con su nombre y un botón para guardarlo, con la categoría deducida
+  del tipo de sitio.
 - **Exportar / importar** los datos en JSON (copia de seguridad y traspaso de dispositivo).
 - **Instalable como app** (PWA): se añade a la pantalla de inicio, se abre a
   pantalla completa sin barra del navegador y arranca sin conexión.
