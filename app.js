@@ -954,6 +954,7 @@
 
   // --- Diálogo de categorías ------------------------------------------------
   var editandoCat = null;   // id de la categoría propia en edición
+  var nuevaCatId = null;    // id de la última creada, para seleccionarla
 
   function abrirCategorias() {
     editandoCat = null;
@@ -1065,6 +1066,7 @@
       var id = "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       customCats.push({ id: id, label: label, emoji: emoji, color: color, propia: true });
       filters.cats[id] = true;
+      nuevaCatId = id;
     }
 
     var eraEdicion = !!editandoCat;   // resetFormularioCat lo pone a null
@@ -1072,6 +1074,13 @@
       refrescarCategorias();
       pintarListaCategorias();
       resetFormularioCat();
+      // Si se estaba registrando un punto, se deja elegida la recién creada
+      // y se vuelve al punto para no perder el hilo.
+      if (nuevaCatId && !$("#editor").hidden) {
+        $("#poi-cat").value = nuevaCatId;
+        cerrarCategorias();
+      }
+      nuevaCatId = null;
       toast(eraEdicion ? "Categoría guardada." : "Categoría creada.");
     }).catch(function () { toast("No se pudo guardar."); });
   }
@@ -1376,6 +1385,7 @@
     $("#btn-reset-filters").addEventListener("click", resetFilters);
 
     $("#cats-manage").addEventListener("click", abrirCategorias);
+    $("#poi-cat-new").addEventListener("click", abrirCategorias);
     $("#cats-close").addEventListener("click", cerrarCategorias);
     $("#cats-done").addEventListener("click", cerrarCategorias);
     $("#cats-backdrop").addEventListener("click", cerrarCategorias);

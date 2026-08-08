@@ -398,11 +398,11 @@ select.field-input { cursor: pointer; }
    Editor (modal)
    -------------------------------------------------------------------------- */
 .editor-backdrop {
-  position: fixed; inset: 0; background: rgba(15, 15, 18, 0.5); z-index: 900;
+  position: fixed; inset: 0; background: rgba(15, 15, 18, 0.5); z-index: 1300;
   -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
 }
 .editor {
-  position: fixed; z-index: 950;
+  position: fixed; z-index: 1350;
   top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: min(452px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem);
   background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--elev-3);
@@ -464,8 +464,23 @@ select.field-input { cursor: pointer; }
   flex: 0 0 auto; border: 1px solid var(--line);
 }
 
-/* Diálogo de categorías */
+/* Diálogo de categorías: por encima del editor de puntos, para poder crear
+   una categoría sin cerrar el punto que se está registrando. */
+#cats-backdrop { z-index: 1400; }
+#cats-modal { z-index: 1450; }
+
 .panel-head-actions { display: inline-flex; gap: 0.75rem; }
+
+/* Selector de categoría con botón para crear una nueva */
+.cat-row { display: flex; gap: 0.45rem; }
+.cat-new {
+  flex: 0 0 auto; width: 44px; height: 40px;
+  border: 1px dashed var(--line-strong); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--ink-soft);
+  font-size: 1.1rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cat-new:hover { border-color: var(--accent); color: var(--accent); }
 .cats-help { font-size: 0.83rem; color: var(--ink-soft); margin-bottom: 0.75rem; }
 .cats-list { list-style: none; margin-bottom: 1rem; }
 .cats-item {
@@ -546,7 +561,7 @@ select.field-input { cursor: pointer; }
   bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   background: var(--negro); color: var(--blanco);
   padding: 0.65rem 1.2rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500;
-  z-index: 1000; box-shadow: var(--elev-3); max-width: calc(100vw - 2rem);
+  z-index: 1500; box-shadow: var(--elev-3); max-width: calc(100vw - 2rem);
 }
 
 /* --------------------------------------------------------------------------
