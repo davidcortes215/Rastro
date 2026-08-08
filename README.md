@@ -31,7 +31,9 @@ servidor propio en esta primera fase.
 - **Fotos** por punto (hasta 6). Se reescalan y comprimen en el navegador
   antes de subirlas; en modo nube van a Supabase Storage y en modo local
   quedan incrustadas en el navegador.
-- **Filtros combinables**: búsqueda por texto, categorías, valoración mínima y estado.
+- **Filtros combinables**: búsqueda por texto, categorías, valoración mínima y
+  estado. Con todas las categorías activas, pulsar una deja solo esa; volver a
+  pulsarla las restaura todas.
 - **Ordenación** por valoración, **cercanía**, nombre o fecha de alta. Al ordenar
   por cercanía se muestra la distancia a cada sitio, medida desde la ubicación
   del usuario o, si no da permiso, desde el centro del mapa.

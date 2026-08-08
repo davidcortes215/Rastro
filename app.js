@@ -846,6 +846,29 @@
   }
 
   // --- Filtros UI ---------------------------------------------------------
+  function todasActivas() {
+    return CATEGORIES.every(function (x) { return filters.cats[x.id]; });
+  }
+  function soloActiva(id) {
+    return filters.cats[id] && CATEGORIES.every(function (x) {
+      return x.id === id || !filters.cats[x.id];
+    });
+  }
+  // Refleja el estado de los filtros en los chips y explica en el título qué
+  // hará la siguiente pulsación.
+  function sincronizarChips() {
+    var todas = todasActivas();
+    document.querySelectorAll("#filter-cats .chip").forEach(function (b) {
+      var id = b.dataset.cat;
+      var activa = !!filters.cats[id];
+      b.setAttribute("aria-pressed", activa ? "true" : "false");
+      var etiqueta = (CAT_BY_ID[id] || {}).label || id;
+      b.title = todas ? "Ver solo " + etiqueta
+              : soloActiva(id) ? "Ver todas las categorías"
+              : (activa ? "Ocultar " + etiqueta : "Mostrar " + etiqueta);
+    });
+  }
+
   function buildCategoryUI() {
     var box = $("#filter-cats");
     CATEGORIES.forEach(function (c) {
@@ -854,13 +877,24 @@
       var dot = el("span", "chip-dot"); dot.style.background = c.color;
       b.appendChild(dot); b.appendChild(el("span", null, c.label));
       b.addEventListener("click", function () {
-        filters.cats[c.id] = !filters.cats[c.id];
-        b.setAttribute("aria-pressed", filters.cats[c.id] ? "true" : "false");
+        // Con todas encendidas, pulsar una deja solo esa (lo habitual es
+        // querer ver una categoría suelta, no apagar las once restantes).
+        // Y si ya era la única, se vuelven a encender todas.
+        if (todasActivas()) {
+          CATEGORIES.forEach(function (x) { filters.cats[x.id] = (x.id === c.id); });
+        } else if (soloActiva(c.id)) {
+          CATEGORIES.forEach(function (x) { filters.cats[x.id] = true; });
+        } else {
+          filters.cats[c.id] = !filters.cats[c.id];
+        }
+        sincronizarChips();
         refresh();
         if (viewMode === "all") scheduleDiscover();
       });
       box.appendChild(b);
     });
+    sincronizarChips();
+
     var sel = $("#poi-cat");
     CATEGORIES.forEach(function (c) {
       var o = el("option", null, c.emoji + "  " + c.label); o.value = c.id; sel.appendChild(o);
@@ -894,7 +928,7 @@
     filters.text = ""; filters.rating = 0; filters.status = "todos";
     CATEGORIES.forEach(function (c) { filters.cats[c.id] = true; });
     $("#filter-text").value = ""; $("#filter-rating").value = "0"; $("#filter-status").value = "todos";
-    document.querySelectorAll("#filter-cats .chip").forEach(function (b) { b.setAttribute("aria-pressed", "true"); });
+    sincronizarChips();
     refresh();
     if (viewMode === "all") scheduleDiscover();
   }
@@ -1161,7 +1195,7 @@
     $("#cats-toggle-all").addEventListener("click", function () {
       var anyOff = CATEGORIES.some(function (c) { return !filters.cats[c.id]; });
       CATEGORIES.forEach(function (c) { filters.cats[c.id] = anyOff; });
-      document.querySelectorAll("#filter-cats .chip").forEach(function (b) { b.setAttribute("aria-pressed", anyOff ? "true" : "false"); });
+      sincronizarChips();
       refresh();
       if (viewMode === "all") scheduleDiscover();
     });
