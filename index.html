@@ -5,9 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Rastro</title>
   <meta name="description" content="Registra, valora y filtra tus puntos de interés sobre un mapa: restaurantes, miradores, faros, acampadas y más.">
-  <meta name="theme-color" content="#141414">
+  <meta name="theme-color" content="#141416">
   <link rel="icon" type="image/png" sizes="64x64" href="icono-64.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icono-180.png">
+
+  <!-- App instalable -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Rastro">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <link rel="stylesheet" href="styles.css">
@@ -104,6 +111,7 @@
           <button type="button" class="linkbtn" id="btn-export">Exportar</button>
           <button type="button" class="linkbtn" id="btn-import">Importar</button>
           <input type="file" id="import-file" accept="application/json" hidden>
+          <button type="button" class="linkbtn" id="btn-install" hidden>Instalar app</button>
           <button type="button" class="linkbtn panel-footer-end" id="btn-logout" hidden>Cerrar sesión</button>
         </div>
       </aside>
@@ -221,5 +229,6 @@
   <script src="store.js"></script>
   <script src="app.js"></script>
   <script src="cloud.js"></script>
+  <script src="pwa.js"></script>
 </body>
 </html>

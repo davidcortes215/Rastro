@@ -34,6 +34,8 @@ servidor propio en esta primera fase.
 - **Filtros combinables**: búsqueda por texto, categorías, valoración mínima y estado.
 - **Buscador de lugares** (geocodificación) para localizar un sitio y guardarlo.
 - **Exportar / importar** los datos en JSON (copia de seguridad y traspaso de dispositivo).
+- **Instalable como app** (PWA): se añade a la pantalla de inicio, se abre a
+  pantalla completa sin barra del navegador y arranca sin conexión.
 - **Responsive**: panel lateral en escritorio, pantalla completa en móvil.
 - **White-label**: marca, color, mapa y categorías se configuran en un solo archivo.
 
@@ -49,6 +51,9 @@ rastro/
 ├── store.js            Capa de datos local (localStorage)
 ├── cloud.js            Registro/sesión + datos por usuario en la nube (Supabase)
 ├── app.js              Lógica de la aplicación
+├── pwa.js              Instalación como app y registro del service worker
+├── sw.js               Service worker (funcionamiento sin conexión)
+├── manifest.json       Datos de la app instalable (nombre, iconos, colores)
 ├── icono-64.png        Icono de la pestaña del navegador
 ├── icono-180.png       Icono al añadir a la pantalla de inicio (iOS)
 ├── icono-192.png       Icono para la app instalable
@@ -74,6 +79,16 @@ el resto del código:
 - `categories`: lista de categorías con `id`, `label`, `emoji` y `color`.
 
 Rebrandear la app suele ser cuestión de cambiar `name`, `accent` y `categories`.
+
+Al cambiar de marca hay dos sitios más que tocar, porque son archivos
+estáticos y no leen `config.js`:
+
+- **`manifest.json`**: `name`, `short_name`, `description` y los colores.
+- **`index.html`**: la etiqueta `apple-mobile-web-app-title` y los iconos
+  (`icono-*.png`), que conviene regenerar con la marca del cliente.
+
+Si cambias los nombres de archivo de los iconos, actualiza también la lista
+`CORE` de `sw.js`.
 
 ---
 
