@@ -988,6 +988,7 @@
       li.appendChild(el("span", "cats-item-count", usos ? usos + "" : ""));
 
       if (esPropia(c.id)) {
+        li.appendChild(el("span", "cats-item-tag cats-item-tag--privada", "privada"));
         var ed = el("button", "linkbtn", "Editar");
         ed.type = "button";
         ed.addEventListener("click", function () { editarCategoria(c.id); });
@@ -998,7 +999,7 @@
         acc.appendChild(ed); acc.appendChild(bo);
         li.appendChild(acc);
       } else {
-        li.appendChild(el("span", "cats-item-fixed", "de serie"));
+        li.appendChild(el("span", "cats-item-tag", "común"));
       }
       ul.appendChild(li);
     });

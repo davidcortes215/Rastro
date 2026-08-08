@@ -482,11 +482,13 @@ select.field-input { cursor: pointer; }
   font-family: var(--mono); font-size: 0.68rem; color: var(--ink-faint);
   min-width: 1.2rem; text-align: right;
 }
-.cats-item-fixed {
+.cats-item-tag {
   font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase;
   letter-spacing: 0.04em; color: var(--ink-faint);
   background: var(--surface-3); padding: 0.15rem 0.4rem; border-radius: 4px;
+  flex: 0 0 auto;
 }
+.cats-item-tag--privada { color: var(--accent); background: var(--accent-weak); }
 .cats-item-actions { display: inline-flex; gap: 0.6rem; }
 .cats-del { color: #c62828; }
 
