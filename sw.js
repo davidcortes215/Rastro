@@ -9,7 +9,7 @@
    Las peticiones a otros dominios (teselas del mapa, Supabase, Overpass) no
    se interceptan: se dejan pasar tal cual.
    ========================================================================== */
-var CACHE = "rastro-v1";
+var CACHE = "rastro-v2";
 var CORE = [
   "./",
   "./index.html",
@@ -53,8 +53,17 @@ self.addEventListener("fetch", function (e) {
   try { url = new URL(req.url); } catch (err) { return; }
   if (url.origin !== self.location.origin) return;   // mapas y servicios: sin tocar
 
+  // Se pide siempre con revalidación: GitHub Pages marca los archivos como
+  // cacheables varios minutos y, sin esto, la versión antigua del navegador
+  // se servía como si fuera la buena y los cambios no llegaban.
+  // Para navegaciones se construye desde la URL: no se puede crear un
+  // Request nuevo a partir de otro en modo "navigate".
+  var peticion = (req.mode === "navigate")
+    ? fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
+    : fetch(req, { cache: "no-cache" });
+
   e.respondWith(
-    fetch(req).then(function (res) {
+    peticion.then(function (res) {
       if (res && res.status === 200 && res.type === "basic") {
         var copia = res.clone();
         caches.open(CACHE).then(function (c) { c.put(req, copia); });

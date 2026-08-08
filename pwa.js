@@ -9,9 +9,24 @@
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("./sw.js").catch(function () {
+      navigator.serviceWorker.register("./sw.js").then(function (reg) {
+        // Buscar versiones nuevas al abrir y de vez en cuando.
+        reg.update();
+        setInterval(function () { reg.update(); }, 60 * 60 * 1000);
+      }).catch(function () {
         // Sin service worker la app funciona igual, solo que no se instala.
       });
+    });
+
+    // Cuando entra en servicio una versión nueva se recarga una sola vez,
+    // para que los cambios se vean sin tener que vaciar la caché a mano.
+    // En la primera visita no hay nada que refrescar, así que no se recarga.
+    var teniaControlador = !!navigator.serviceWorker.controller;
+    var recargando = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (!teniaControlador || recargando) return;
+      recargando = true;
+      window.location.reload();
     });
   }
 
