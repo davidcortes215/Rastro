@@ -37,6 +37,8 @@ servidor propio en esta primera fase.
 - **Filtros combinables**: búsqueda por texto, categorías, valoración mínima y
   estado. Con todas las categorías activas, pulsar una deja solo esa; volver a
   pulsarla las restaura todas.
+- **Deslizar en la lista**: hacia la derecha para editar un punto y hacia la
+  izquierda para eliminarlo.
 - **Ordenación** por valoración, **cercanía**, nombre o fecha de alta. Al ordenar
   por cercanía se muestra la distancia a cada sitio, medida desde la ubicación
   del usuario o, si no da permiso, desde el centro del mapa.

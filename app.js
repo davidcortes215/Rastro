@@ -353,6 +353,8 @@
     visible.forEach(function (p) {
       var c = cat(p.cat);
       var li = el("li", "poi-card"); li.dataset.id = p.id;
+      // El contenido va en una capa que se desplaza al deslizar, dejando a la
+      // vista las acciones que hay detrás.
       var top = el("div", "poi-card-top");
       var icon = el("span", "poi-card-icon"); icon.style.background = c.color; icon.textContent = c.emoji;
       top.appendChild(icon);
@@ -380,9 +382,25 @@
         var d = distanciaDe(p);
         if (d != null) meta.appendChild(el("span", "poi-card-dist", formatoDistancia(d)));
       }
-      li.appendChild(meta);
-      if (p.notes) li.appendChild(el("div", "poi-card-notes", p.notes));
-      li.addEventListener("click", function () { focusItem(p.id); });
+      var inner = el("div", "poi-card-inner");
+      inner.appendChild(top);
+      inner.appendChild(meta);
+      if (p.notes) inner.appendChild(el("div", "poi-card-notes", p.notes));
+
+      // Deslizar solo tiene sentido en los puntos propios: los descubiertos
+      // ni se editan ni se borran.
+      if (!p.osm) {
+        li.appendChild(accionDeslizar("edit", "Editar", function () {
+          cerrarTarjetas(); openEditor(p.id, p.lat, p.lng);
+        }));
+        li.appendChild(accionDeslizar("del", "Eliminar", function () {
+          cerrarTarjetas();
+          if (confirm("¿Eliminar “" + p.name + "”?")) deletePoint(p.id);
+        }));
+      }
+      li.appendChild(inner);
+      if (!p.osm) activarDeslizamiento(li, inner, p.id);
+      else inner.addEventListener("click", function () { focusItem(p.id); });
       ul.appendChild(li);
     });
   }
@@ -419,6 +437,88 @@
     }
     return lista.sort(function (a, b) {   // valoración (por defecto)
       return (b.stars || 0) - (a.stars || 0) || a.name.localeCompare(b.name, "es");
+    });
+  }
+
+  // --- Deslizar tarjetas para editar o eliminar ----------------------------
+  var ANCHO_ACCION = 96;   // lo que se destapa al deslizar
+
+  function accionDeslizar(tipo, texto, alPulsar) {
+    var caja = el("div", "poi-card-act poi-card-act--" + tipo);
+    var b = el("button", null, texto);
+    b.type = "button";
+    b.addEventListener("click", function (e) { e.stopPropagation(); alPulsar(); });
+    caja.appendChild(b);
+    return caja;
+  }
+
+  function cerrarTarjetas(excepto) {
+    document.querySelectorAll(".poi-card.is-open-left, .poi-card.is-open-right")
+      .forEach(function (c) {
+        if (c === excepto) return;
+        c.classList.remove("is-open-left", "is-open-right");
+        var i = c.querySelector(".poi-card-inner");
+        if (i) i.style.transform = "";
+      });
+  }
+
+  function activarDeslizamiento(li, inner, id) {
+    var x0 = 0, y0 = 0, base = 0;
+    var siguiendo = false, horizontal = false, arrastrado = false;
+
+    li.addEventListener("pointerdown", function (e) {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      x0 = e.clientX; y0 = e.clientY;
+      base = li.classList.contains("is-open-left") ? -ANCHO_ACCION
+           : li.classList.contains("is-open-right") ? ANCHO_ACCION : 0;
+      siguiendo = true; horizontal = false; arrastrado = false;
+      inner.style.transition = "none";
+    });
+
+    li.addEventListener("pointermove", function (e) {
+      if (!siguiendo) return;
+      var dx = e.clientX - x0, dy = e.clientY - y0;
+      if (!horizontal) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        // Si el gesto es mas vertical, se deja pasar para que la lista ruede.
+        if (Math.abs(dx) <= Math.abs(dy)) { siguiendo = false; inner.style.transition = ""; return; }
+        horizontal = true;
+        if (li.setPointerCapture) { try { li.setPointerCapture(e.pointerId); } catch (err) {} }
+        cerrarTarjetas(li);
+      }
+      arrastrado = true;
+      var t = Math.max(-ANCHO_ACCION - 24, Math.min(ANCHO_ACCION + 24, base + dx));
+      inner.style.transform = "translateX(" + t + "px)";
+    });
+
+    function soltar(e) {
+      if (!siguiendo) return;
+      siguiendo = false;
+      inner.style.transition = "";
+      if (!horizontal) return;
+      var t = base + (e.clientX - x0);
+      li.classList.remove("is-open-left", "is-open-right");
+      if (t <= -ANCHO_ACCION / 2) {
+        li.classList.add("is-open-left");           // queda a la vista "Eliminar"
+        inner.style.transform = "translateX(-" + ANCHO_ACCION + "px)";
+      } else if (t >= ANCHO_ACCION / 2) {
+        li.classList.add("is-open-right");          // queda a la vista "Editar"
+        inner.style.transform = "translateX(" + ANCHO_ACCION + "px)";
+      } else {
+        inner.style.transform = "";
+      }
+    }
+    li.addEventListener("pointerup", soltar);
+    li.addEventListener("pointercancel", soltar);
+
+    inner.addEventListener("click", function (e) {
+      // Un arrastre no debe contar como pulsacion, y con la tarjeta abierta
+      // el primer toque simplemente la cierra.
+      if (arrastrado) { arrastrado = false; e.stopPropagation(); return; }
+      if (li.classList.contains("is-open-left") || li.classList.contains("is-open-right")) {
+        e.stopPropagation(); cerrarTarjetas(); return;
+      }
+      focusItem(id);
     });
   }
 

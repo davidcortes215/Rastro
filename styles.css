@@ -241,11 +241,30 @@ select.field-input { cursor: pointer; }
 .poi-list::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 5px; border: 2px solid var(--surface); }
 
 .poi-card {
-  padding: 0.72rem 0.95rem; border-bottom: 1px solid var(--line);
-  cursor: pointer; transition: background 0.12s ease, box-shadow 0.12s ease;
+  position: relative; overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  touch-action: pan-y;            /* el gesto horizontal lo tratamos nosotros */
 }
-.poi-card:hover { background: var(--surface-2); }
-.poi-card.is-active { background: var(--accent-weak); box-shadow: inset 3px 0 0 var(--accent); }
+/* Capa que se desplaza; debajo quedan las acciones */
+.poi-card-inner {
+  position: relative; z-index: 1;
+  padding: 0.72rem 0.95rem;
+  background: var(--surface);
+  transition: transform 0.22s cubic-bezier(0.25, 0.9, 0.3, 1), background 0.12s ease;
+  will-change: transform;
+}
+.poi-card:hover .poi-card-inner { background: var(--surface-2); }
+.poi-card.is-active .poi-card-inner { background: var(--accent-weak); box-shadow: inset 3px 0 0 var(--accent); }
+
+/* Acciones que se destapan al deslizar */
+.poi-card-act { position: absolute; top: 0; bottom: 0; display: flex; }
+.poi-card-act--edit { left: 0; background: var(--accent); }
+.poi-card-act--del { right: 0; background: #c62828; }
+.poi-card-act button {
+  width: 96px; border: none; background: none; color: #fff;
+  font-size: 0.82rem; font-weight: 600; letter-spacing: 0.01em;
+}
 .poi-card-top { display: flex; align-items: center; gap: 0.55rem; }
 .poi-card-icon {
   width: 26px; height: 26px; border-radius: 8px;
