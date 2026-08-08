@@ -10,10 +10,25 @@
   "use strict";
 
   var CFG = window.APP_CONFIG;
-  var CATEGORIES = CFG.categories;
+  // Las categorías de la configuración (iguales para todos) más las que cada
+  // usuario crea, que son privadas de su cuenta.
+  var BASE_CATEGORIES = CFG.categories;
+  var customCats = [];
+  var CATEGORIES = BASE_CATEGORIES.slice();
   var CAT_BY_ID = {};
   CATEGORIES.forEach(function (c) { CAT_BY_ID[c.id] = c; });
   function cat(id) { return CAT_BY_ID[id] || CAT_BY_ID.otro || CATEGORIES[CATEGORIES.length - 1]; }
+  function esPropia(id) {
+    return customCats.some(function (c) { return c.id === id; });
+  }
+  function reindexarCategorias() {
+    CATEGORIES = BASE_CATEGORIES.concat(customCats);
+    CAT_BY_ID = {};
+    CATEGORIES.forEach(function (c) { CAT_BY_ID[c.id] = c; });
+    CATEGORIES.forEach(function (c) {
+      if (filters.cats[c.id] === undefined) filters.cats[c.id] = true;
+    });
+  }
   var DEFAULT_STATUS = (CFG.statuses[0] && CFG.statuses[0].id) || "visitado";
   var DISCOVER = CFG.discover || { enabled: false };
 
@@ -869,16 +884,49 @@
     });
   }
 
-  function buildCategoryUI() {
+  // --- Categorías propias del usuario --------------------------------------
+  function cargarCategoriasPropias() {
+    if (!Store.getSettings) { reindexarCategorias(); return Promise.resolve(); }
+    return Store.getSettings().then(function (ajustes) {
+      var lista = (ajustes && ajustes.categorias) || [];
+      customCats = lista.filter(function (c) {
+        return c && c.id && c.label;
+      }).map(function (c) {
+        return { id: c.id, label: c.label, emoji: c.emoji || "📍", color: c.color || "#616161", propia: true };
+      });
+      reindexarCategorias();
+    }).catch(function () { reindexarCategorias(); });
+  }
+  function guardarCategoriasPropias() {
+    if (!Store.getSettings) return Promise.resolve();
+    return Store.getSettings().then(function (ajustes) {
+      ajustes = ajustes || {};
+      ajustes.categorias = customCats.map(function (c) {
+        return { id: c.id, label: c.label, emoji: c.emoji, color: c.color };
+      });
+      return Store.saveSettings(ajustes);
+    });
+  }
+  // Reconstruye todo lo que depende de la lista de categorías.
+  function refrescarCategorias() {
+    reindexarCategorias();
+    construirChips();
+    construirSelectorCategoria();
+    sincronizarChips();
+    refresh();
+  }
+
+  function construirChips() {
     var box = $("#filter-cats");
+    box.innerHTML = "";
     CATEGORIES.forEach(function (c) {
       var b = el("button", "chip"); b.type = "button"; b.dataset.cat = c.id;
-      b.setAttribute("aria-pressed", "true");
+      b.setAttribute("aria-pressed", filters.cats[c.id] ? "true" : "false");
       var dot = el("span", "chip-dot"); dot.style.background = c.color;
       b.appendChild(dot); b.appendChild(el("span", null, c.label));
       b.addEventListener("click", function () {
         // Con todas encendidas, pulsar una deja solo esa (lo habitual es
-        // querer ver una categoría suelta, no apagar las once restantes).
+        // querer ver una categoría suelta, no apagar las demás una a una).
         // Y si ya era la única, se vuelven a encender todas.
         if (todasActivas()) {
           CATEGORIES.forEach(function (x) { filters.cats[x.id] = (x.id === c.id); });
@@ -893,12 +941,144 @@
       });
       box.appendChild(b);
     });
-    sincronizarChips();
-
+  }
+  function construirSelectorCategoria() {
     var sel = $("#poi-cat");
+    var previo = sel.value;
+    sel.innerHTML = "";
     CATEGORIES.forEach(function (c) {
       var o = el("option", null, c.emoji + "  " + c.label); o.value = c.id; sel.appendChild(o);
     });
+    if (previo && CAT_BY_ID[previo]) sel.value = previo;
+  }
+
+  // --- Diálogo de categorías ------------------------------------------------
+  var editandoCat = null;   // id de la categoría propia en edición
+
+  function abrirCategorias() {
+    editandoCat = null;
+    resetFormularioCat();
+    pintarListaCategorias();
+    $("#cats-backdrop").hidden = false;
+    $("#cats-modal").hidden = false;
+  }
+  function cerrarCategorias() {
+    $("#cats-modal").hidden = true;
+    $("#cats-backdrop").hidden = true;
+  }
+  function resetFormularioCat() {
+    editandoCat = null;
+    $("#cat-emoji").value = "📍";
+    $("#cat-color").value = "#EA7317";
+    $("#cat-label").value = "";
+    $("#cats-form-title").textContent = "Nueva categoría";
+    $("#cat-submit").textContent = "Añadir";
+    $("#cat-cancel").hidden = true;
+  }
+  function pintarListaCategorias() {
+    var ul = $("#cats-list");
+    ul.innerHTML = "";
+    CATEGORIES.forEach(function (c) {
+      var li = el("li", "cats-item");
+      var ic = el("span", "cats-item-icon", c.emoji);
+      ic.style.background = c.color;
+      li.appendChild(ic);
+      li.appendChild(el("span", "cats-item-name", c.label));
+      var usos = points.filter(function (p) { return p.cat === c.id; }).length;
+      li.appendChild(el("span", "cats-item-count", usos ? usos + "" : ""));
+
+      if (esPropia(c.id)) {
+        var ed = el("button", "linkbtn", "Editar");
+        ed.type = "button";
+        ed.addEventListener("click", function () { editarCategoria(c.id); });
+        var bo = el("button", "linkbtn cats-del", "Borrar");
+        bo.type = "button";
+        bo.addEventListener("click", function () { borrarCategoria(c.id); });
+        var acc = el("span", "cats-item-actions");
+        acc.appendChild(ed); acc.appendChild(bo);
+        li.appendChild(acc);
+      } else {
+        li.appendChild(el("span", "cats-item-fixed", "de serie"));
+      }
+      ul.appendChild(li);
+    });
+  }
+  function editarCategoria(id) {
+    var c = CAT_BY_ID[id];
+    if (!c) return;
+    editandoCat = id;
+    $("#cat-emoji").value = c.emoji;
+    $("#cat-color").value = /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : "#EA7317";
+    $("#cat-label").value = c.label;
+    $("#cats-form-title").textContent = "Editar categoría";
+    $("#cat-submit").textContent = "Guardar";
+    $("#cat-cancel").hidden = false;
+    $("#cat-label").focus();
+  }
+  function borrarCategoria(id) {
+    var usos = points.filter(function (p) { return p.cat === id; });
+    var aviso = usos.length
+      ? "Hay " + usos.length + (usos.length === 1 ? " punto" : " puntos") +
+        " con esta categoría. Pasarán a “Otro”. ¿Borrarla igualmente?"
+      : "¿Borrar esta categoría?";
+    if (!confirm(aviso)) return;
+
+    customCats = customCats.filter(function (c) { return c.id !== id; });
+    delete filters.cats[id];
+
+    // Los puntos afectados se reasignan para que no queden sin categoría.
+    var destino = CAT_BY_ID.otro ? "otro" : BASE_CATEGORIES[0].id;
+    var pendientes = usos.map(function (p) {
+      p.cat = destino;
+      return Store.update(p.id, p);
+    });
+
+    Promise.all(pendientes)
+      .then(guardarCategoriasPropias)
+      .then(function () {
+        refrescarCategorias();
+        pintarListaCategorias();
+        toast("Categoría borrada.");
+      })
+      .catch(function () { toast("No se pudo borrar."); });
+  }
+  function enviarFormularioCat(e) {
+    e.preventDefault();
+    var label = $("#cat-label").value.trim();
+    if (!label) { $("#cat-label").focus(); return; }
+    var emoji = $("#cat-emoji").value.trim() || "📍";
+    var color = $("#cat-color").value || "#EA7317";
+
+    var repetida = CATEGORIES.some(function (c) {
+      return c.id !== editandoCat && c.label.toLowerCase() === label.toLowerCase();
+    });
+    if (repetida) { toast("Ya existe una categoría con ese nombre."); return; }
+
+    if (editandoCat) {
+      customCats.forEach(function (c) {
+        if (c.id === editandoCat) { c.label = label; c.emoji = emoji; c.color = color; }
+      });
+    } else {
+      var max = (CFG.categoriesMax || 20);
+      if (customCats.length >= max) { toast("Máximo " + max + " categorías propias."); return; }
+      var id = "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      customCats.push({ id: id, label: label, emoji: emoji, color: color, propia: true });
+      filters.cats[id] = true;
+    }
+
+    var eraEdicion = !!editandoCat;   // resetFormularioCat lo pone a null
+    guardarCategoriasPropias().then(function () {
+      refrescarCategorias();
+      pintarListaCategorias();
+      resetFormularioCat();
+      toast(eraEdicion ? "Categoría guardada." : "Categoría creada.");
+    }).catch(function () { toast("No se pudo guardar."); });
+  }
+
+  function buildCategoryUI() {
+    construirChips();
+    sincronizarChips();
+    construirSelectorCategoria();
     var fs = $("#filter-status");
     CFG.statuses.forEach(function (s) {
       var o = el("option", null, s.label + "s"); o.value = s.id; fs.appendChild(o);
@@ -1176,7 +1356,8 @@
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
-        if (!$("#editor").hidden) closeEditor();
+        if (!$("#cats-modal").hidden) cerrarCategorias();
+        else if (!$("#editor").hidden) closeEditor();
         else if (addMode) setAddMode(false);
       }
     });
@@ -1192,6 +1373,13 @@
       renderList();
     });
     $("#btn-reset-filters").addEventListener("click", resetFilters);
+
+    $("#cats-manage").addEventListener("click", abrirCategorias);
+    $("#cats-close").addEventListener("click", cerrarCategorias);
+    $("#cats-done").addEventListener("click", cerrarCategorias);
+    $("#cats-backdrop").addEventListener("click", cerrarCategorias);
+    $("#cats-form").addEventListener("submit", enviarFormularioCat);
+    $("#cat-cancel").addEventListener("click", resetFormularioCat);
     $("#cats-toggle-all").addEventListener("click", function () {
       var anyOff = CATEGORIES.some(function (c) { return !filters.cats[c.id]; });
       CATEGORIES.forEach(function (c) { filters.cats[c.id] = anyOff; });
@@ -1263,13 +1451,23 @@
     if (window.innerWidth <= 720) $("#panel").classList.add("is-hidden");
   }
   function loadPoints() {
-    return Store.getAll().then(function (list) {
+    // Primero las categorías propias: los puntos las necesitan para pintarse
+    // con su emoji y su color.
+    return cargarCategoriasPropias().then(function () {
+      construirChips();
+      construirSelectorCategoria();
+      sincronizarChips();
+      return Store.getAll();
+    }).then(function (list) {
       points = Array.isArray(list) ? list : [];
       refresh();
     }).catch(function () { points = []; refresh(); });
   }
   function clearData() {
     points = []; discovered = []; viewMode = "mine";
+    customCats = [];              // son privadas de cada cuenta
+    reindexarCategorias();
+    construirChips(); construirSelectorCategoria(); sincronizarChips();
     document.querySelector(".app").classList.remove("mode-all");
     refresh();
   }

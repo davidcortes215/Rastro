@@ -27,6 +27,9 @@ servidor propio en esta primera fase.
   Relieve, Satélite y OSM clásico); la elección se recuerda. Al abrir intenta
   centrarse en la ubicación del usuario; si no, muestra la vista configurada.
 - **Puntos de interés** por categorías, con marcador de color y emoji.
+- **Categorías propias**: cada usuario puede crear, editar y borrar las suyas
+  (nombre, emoji y color). Son privadas de su cuenta y se suman a las de serie;
+  al borrar una, sus puntos pasan a «Otro».
 - **Valoración** de 1 a 5 estrellas, **estado** (visitado / pendiente) y **notas**.
 - **Fotos** por punto (hasta 6). Se reescalan y comprimen en el navegador
   antes de subirlas; en modo nube van a Supabase Storage y en modo local
@@ -187,6 +190,34 @@ Store.replaceAll(points)  // → Promise<void>
    Cada usuario solo puede subir y borrar dentro de su propia carpeta
    (`{user_id}/{punto}/...`). El depósito es de lectura pública, que es lo
    que permite mostrar las fotos con una URL directa.
+
+6. Para las **categorías propias de cada usuario** (y futuros ajustes
+   personales), crea esta tabla:
+
+   ```sql
+   create table if not exists public.settings (
+     user_id uuid primary key default auth.uid() references auth.users(id) on delete cascade,
+     data jsonb not null default '{}'::jsonb,
+     updated_at timestamptz not null default now()
+   );
+   alter table public.settings enable row level security;
+
+   drop policy if exists "ajustes_propios_select" on public.settings;
+   create policy "ajustes_propios_select" on public.settings for select using (auth.uid() = user_id);
+
+   drop policy if exists "ajustes_propios_insert" on public.settings;
+   create policy "ajustes_propios_insert" on public.settings for insert with check (auth.uid() = user_id);
+
+   drop policy if exists "ajustes_propios_update" on public.settings;
+   create policy "ajustes_propios_update" on public.settings for update
+     using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+   drop policy if exists "ajustes_propios_delete" on public.settings;
+   create policy "ajustes_propios_delete" on public.settings for delete using (auth.uid() = user_id);
+   ```
+
+   Sin esta tabla la app sigue funcionando: simplemente no se guardan las
+   categorías propias en la nube.
 
 Las claves `anon` son **públicas por diseño**: la seguridad la garantizan las
 políticas RLS (cada usuario solo accede a sus filas). Para volver al modo local,

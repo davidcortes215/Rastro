@@ -73,7 +73,22 @@
         fr.readAsDataURL(blob);
       });
     },
-    deletePhoto: function () { return Promise.resolve(); }
+    deletePhoto: function () { return Promise.resolve(); },
+
+    // Ajustes del usuario (por ahora, sus categorías propias).
+    getSettings: function () {
+      try {
+        var raw = localStorage.getItem(key() + ":ajustes");
+        var o = raw ? JSON.parse(raw) : {};
+        return Promise.resolve(o && typeof o === "object" ? o : {});
+      } catch (e) { return Promise.resolve({}); }
+    },
+    saveSettings: function (obj) {
+      try {
+        localStorage.setItem(key() + ":ajustes", JSON.stringify(obj || {}));
+        return Promise.resolve();
+      } catch (e) { return Promise.reject(new Error("storage-full")); }
+    }
   };
 
   window.LocalStore = LocalStore;

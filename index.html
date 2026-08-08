@@ -75,7 +75,10 @@
         <div class="panel-section">
           <div class="panel-section-head">
             <span class="label">Categorías</span>
-            <button type="button" class="linkbtn" id="cats-toggle-all">Todas</button>
+            <span class="panel-head-actions">
+              <button type="button" class="linkbtn" id="cats-manage">Editar</button>
+              <button type="button" class="linkbtn" id="cats-toggle-all">Todas</button>
+            </span>
           </div>
           <div class="chips" id="filter-cats" role="group" aria-label="Filtrar por categoría"></div>
         </div>
@@ -205,6 +208,41 @@
         </div>
       </div>
     </form>
+  </div>
+
+  <!-- Gestión de categorías propias -->
+  <div class="editor-backdrop" id="cats-backdrop" hidden></div>
+  <div class="editor" id="cats-modal" role="dialog" aria-modal="true" aria-labelledby="cats-title" hidden>
+    <div class="editor-head">
+      <h2 id="cats-title">Categorías</h2>
+      <button type="button" class="editor-close" id="cats-close" aria-label="Cerrar">&times;</button>
+    </div>
+
+    <div class="editor-body">
+      <p class="cats-help">Las tuyas son privadas: solo tú las ves.</p>
+      <ul class="cats-list" id="cats-list"></ul>
+
+      <form class="cats-form" id="cats-form">
+        <span class="label" id="cats-form-title">Nueva categoría</span>
+        <div class="cats-form-row">
+          <input type="text" class="field-input cats-emoji" id="cat-emoji" value="📍"
+                 maxlength="4" aria-label="Emoji" autocomplete="off">
+          <input type="color" class="cats-color" id="cat-color" value="#EA7317" aria-label="Color">
+          <input type="text" class="field-input" id="cat-label" placeholder="Nombre (ej. Cafetería de especialidad)"
+                 maxlength="40" required>
+        </div>
+        <div class="cats-form-actions">
+          <button type="button" class="btn btn--ghost" id="cat-cancel" hidden>Cancelar</button>
+          <button type="submit" class="btn btn--solid" id="cat-submit">Añadir</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="editor-foot">
+      <div class="editor-foot-right">
+        <button type="button" class="btn btn--ghost" id="cats-done">Listo</button>
+      </div>
+    </div>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>

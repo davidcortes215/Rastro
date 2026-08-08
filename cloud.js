@@ -64,6 +64,22 @@
         if (!photo || !photo.path) return Promise.resolve();
         var bucket = cloud.photoBucket || "fotos";
         return sb.storage.from(bucket).remove([photo.path]).then(function () {});
+      },
+
+      // Ajustes del usuario (por ahora, sus categorías propias).
+      getSettings: function () {
+        return sb.from("settings").select("data").eq("user_id", currentUserId).maybeSingle()
+          .then(function (r) {
+            if (r && r.error && r.error.code !== "PGRST116") throw r.error;
+            return (r && r.data && r.data.data) || {};
+          })
+          .catch(function () { return {}; });   // sin tabla o sin fila: ajustes vacíos
+      },
+      saveSettings: function (obj) {
+        return sb.from("settings")
+          .upsert({ user_id: currentUserId, data: obj || {}, updated_at: new Date().toISOString() },
+                  { onConflict: "user_id" })
+          .then(check);
       }
     };
   }
