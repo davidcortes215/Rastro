@@ -104,6 +104,16 @@
         </div>
 
         <div class="panel-section">
+          <div class="panel-section-head">
+            <span class="label">Lista</span>
+            <button type="button" class="linkbtn" id="lists-manage">Editar</button>
+          </div>
+          <select class="field-input" id="filter-list">
+            <option value="todas">Todas</option>
+          </select>
+        </div>
+
+        <div class="panel-section">
           <label class="label" for="sort-by">Ordenar por</label>
           <select class="field-input" id="sort-by">
             <option value="valoracion">Valoración</option>
@@ -116,6 +126,7 @@
         <div class="panel-count">
           <span id="count-visible">0</span> de <span id="count-total">0</span> puntos
           <button type="button" class="linkbtn" id="btn-reset-filters" hidden>Limpiar filtros</button>
+          <button type="button" class="linkbtn" id="btn-stats">Resumen</button>
         </div>
 
         <ul class="poi-list" id="poi-list"></ul>
@@ -185,6 +196,12 @@
           <span class="label">Estado</span>
           <div class="toggle-group" id="poi-status" role="radiogroup" aria-label="Estado"></div>
         </div>
+        <div class="field" id="poi-lists-field">
+          <span class="label">Listas</span>
+          <div class="chips" id="poi-lists"></div>
+          <button type="button" class="photo-add" id="poi-list-new">＋ Nueva lista</button>
+        </div>
+
         <div class="field" id="poi-photos-field">
           <span class="label">Fotos <span class="photo-count" id="poi-photo-count"></span></span>
           <div class="photos" id="poi-photos"></div>
@@ -292,6 +309,49 @@
     <div class="editor-foot">
       <div class="editor-foot-right">
         <button type="button" class="btn btn--ghost" id="privacy-done">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Listas -->
+  <div class="editor-backdrop" id="lists-backdrop" hidden></div>
+  <div class="editor" id="lists-modal" role="dialog" aria-modal="true" aria-labelledby="lists-title" hidden>
+    <div class="editor-head">
+      <h2 id="lists-title">Listas</h2>
+      <button type="button" class="editor-close" id="lists-close" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="editor-body">
+      <p class="cats-help">Agrupa tus puntos: un viaje, una temporada, lo que quieras.</p>
+      <ul class="cats-list" id="lists-list"></ul>
+      <form class="cats-form" id="lists-form">
+        <span class="label" id="lists-form-title">Nueva lista</span>
+        <div class="cats-form-row">
+          <input type="text" class="field-input" id="list-name" placeholder="Nombre (ej. Viaje a Galicia)" maxlength="50" required>
+        </div>
+        <div class="cats-form-actions">
+          <button type="button" class="btn btn--ghost" id="list-cancel" hidden>Cancelar</button>
+          <button type="submit" class="btn btn--solid" id="list-submit">Añadir</button>
+        </div>
+      </form>
+    </div>
+    <div class="editor-foot">
+      <div class="editor-foot-right">
+        <button type="button" class="btn btn--ghost" id="lists-done">Listo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumen -->
+  <div class="editor-backdrop" id="stats-backdrop" hidden></div>
+  <div class="editor editor--wide" id="stats-modal" role="dialog" aria-modal="true" aria-labelledby="stats-title" hidden>
+    <div class="editor-head">
+      <h2 id="stats-title">Resumen</h2>
+      <button type="button" class="editor-close" id="stats-close" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="editor-body" id="stats-body"></div>
+    <div class="editor-foot">
+      <div class="editor-foot-right">
+        <button type="button" class="btn btn--ghost" id="stats-done">Cerrar</button>
       </div>
     </div>
   </div>

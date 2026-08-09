@@ -152,7 +152,7 @@ window.APP_CONFIG = {
     { id: "acampada",    label: "Acampada",    emoji: "⛺", color: "#33691E" },
     { id: "ruta",        label: "Ruta",        emoji: "🥾", color: "#F9A825" },
     { id: "pueblo",      label: "Pueblo",      emoji: "🏘️", color: "#8E24AA" },
-    { id: "alojamiento", label: "Alojamiento", emoji: "🛏️", color: "#5E35B1" },
+    { id: "alojamiento", label: "Alojamiento", emoji: "🛏️", color: "#D81B60" },
     { id: "monumento",   label: "Monumento",   emoji: "🏛️", color: "#546E7A" },
     { id: "naturaleza",  label: "Naturaleza",  emoji: "🌲", color: "#1B5E20" },
     { id: "otro",        label: "Otro",        emoji: "📍", color: "#616161" }

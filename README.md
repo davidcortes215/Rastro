@@ -37,6 +37,11 @@ servidor propio en esta primera fase.
 - **Filtros combinables**: búsqueda por texto, categorías, valoración mínima y
   estado. Con todas las categorías activas, pulsar una deja solo esa; volver a
   pulsarla las restaura todas.
+- **Listas**: agrupa los puntos en colecciones («Viaje a Galicia»), filtra por
+  ellas y crea listas nuevas sin salir del punto que estás guardando.
+- **Resumen**: cifras de la colección y reparto por categoría, por lista y por
+  mes. Cada barra lleva su nombre y su cifra escritos, de modo que el color
+  nunca es el único modo de distinguirla.
 - **Deslizar en la lista**: hacia la derecha para editar un punto y hacia la
   izquierda para eliminarlo.
 - **Ordenación** por valoración, **cercanía**, nombre o fecha de alta. Al ordenar

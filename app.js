@@ -43,7 +43,7 @@
   var draftStars = 0;
   var draftStatus = DEFAULT_STATUS;
 
-  var filters = { text: "", cats: {}, rating: 0, status: "todos" };
+  var filters = { text: "", cats: {}, rating: 0, status: "todos", lista: "todas" };
   CATEGORIES.forEach(function (c) { filters.cats[c.id] = true; });
 
   var sortBy = "valoracion";   // valoracion | cercania | nombre | recientes
@@ -261,9 +261,13 @@
     var all = viewMode === "all";
     return activeSet().filter(function (p) {
       if (!filters.cats[p.cat]) return false;
-      if (!all) { // los filtros de valoración/estado solo aplican a tus puntos
+      if (!all) { // valoración, estado y listas solo aplican a tus puntos
         if (filters.rating > 0 && (p.stars || 0) < filters.rating) return false;
         if (filters.status !== "todos" && p.status !== filters.status) return false;
+        if (filters.lista === "sin") { if ((p.lists || []).length) return false; }
+        else if (filters.lista !== "todas") {
+          if ((p.lists || []).indexOf(filters.lista) === -1) return false;
+        }
       }
       if (txt) {
         var hay = (p.name + " " + (p.notes || "") + " " + cat(p.cat).label).toLowerCase();
@@ -274,7 +278,7 @@
   }
   function filtersActive() {
     if (filters.text) return true;
-    if (viewMode === "mine" && (filters.rating > 0 || filters.status !== "todos")) return true;
+    if (viewMode === "mine" && (filters.rating > 0 || filters.status !== "todos" || filters.lista !== "todas")) return true;
     return CATEGORIES.some(function (c) { return !filters.cats[c.id]; });
   }
 
@@ -720,6 +724,7 @@
     pendingDraftId = id || null;
     draftPhotos = p && p.photos ? p.photos.slice() : [];
     initialPhotos = draftPhotos.slice();   // para poder descartar las nuevas al cancelar
+    construirListasEditor(p && p.lists ? p.lists.slice() : []);
     photosBusy = 0;
     if (PHOTOS.enabled) { renderDraftPhotos(); updatePhotoBusy(); }
     var pf = $("#poi-photos-field"); if (pf) pf.hidden = !PHOTOS.enabled;
@@ -752,7 +757,8 @@
     var data = {
       name: name, cat: $("#poi-cat").value, stars: draftStars,
       status: draftStatus, notes: $("#poi-notes").value.trim(),
-      photos: draftPhotos.slice()
+      photos: draftPhotos.slice(),
+      lists: listasSeleccionadas()
     };
     if (editingId) {
       var id = editingId;
@@ -1005,6 +1011,8 @@
     if (!Store.getSettings) { reindexarCategorias(); return Promise.resolve(); }
     return Store.getSettings().then(function (ajustes) {
       var lista = (ajustes && ajustes.categorias) || [];
+      listas = ((ajustes && ajustes.listas) || []).filter(function (l) { return l && l.id && l.nombre; })
+        .map(function (l) { return { id: l.id, nombre: l.nombre }; });
       customCats = lista.filter(function (c) {
         return c && c.id && c.label;
       }).map(function (c) {
@@ -1066,6 +1074,303 @@
       var o = el("option", null, c.emoji + "  " + c.label); o.value = c.id; sel.appendChild(o);
     });
     if (previo && CAT_BY_ID[previo]) sel.value = previo;
+  }
+
+  // --- Resumen -------------------------------------------------------------
+  // Cada barra lleva siempre su nombre y su cifra escritos: el color repite la
+  // identidad que ya usa la app, pero nunca es el único modo de distinguirla
+  // (con doce categorías ninguna paleta llega a ser separable por color).
+  function fichaResumen(valor, etiqueta) {
+    var d = el("div", "stat");
+    d.appendChild(el("div", "stat-num", valor));
+    d.appendChild(el("div", "stat-lab", etiqueta));
+    return d;
+  }
+  function barras(titulo, filas, maximo) {
+    var sec = el("section", "chart");
+    sec.appendChild(el("h3", "chart-title", titulo));
+    var lista = el("div", "bars");
+    filas.forEach(function (f) {
+      var fila = el("div", "bar-row");
+      fila.title = f.etiqueta + ": " + f.valor;
+      var lab = el("div", "bar-label");
+      if (f.emoji) {
+        var pt = el("span", "bar-dot", f.emoji);
+        pt.style.background = f.color;
+        lab.appendChild(pt);
+      }
+      lab.appendChild(el("span", "bar-name", f.etiqueta));
+      fila.appendChild(lab);
+      var pista = el("div", "bar-track");
+      var relleno = el("div", "bar-fill");
+      relleno.style.width = Math.max(2, Math.round((f.valor / maximo) * 100)) + "%";
+      relleno.style.background = f.color || "var(--accent)";
+      pista.appendChild(relleno);
+      fila.appendChild(pista);
+      fila.appendChild(el("div", "bar-val", String(f.valor)));
+      lista.appendChild(fila);
+    });
+    sec.appendChild(lista);
+    return sec;
+  }
+
+  function abrirResumen() {
+    var cuerpo = $("#stats-body");
+    cuerpo.innerHTML = "";
+
+    if (!points.length) {
+      cuerpo.appendChild(emptyState("Todavía no hay nada que resumir.",
+        "Guarda algunos puntos y aquí verás tus números."));
+      $("#stats-backdrop").hidden = false;
+      $("#stats-modal").hidden = false;
+      return;
+    }
+
+    var visitados = points.filter(function (p) { return p.status !== "pendiente"; }).length;
+    var pendientes = points.length - visitados;
+    var fotos = points.reduce(function (n, p) { return n + ((p.photos && p.photos.length) || 0); }, 0);
+    var valorados = points.filter(function (p) { return p.stars > 0; });
+    var media = valorados.length
+      ? (valorados.reduce(function (n, p) { return n + p.stars; }, 0) / valorados.length) : 0;
+    var cincoEstrellas = points.filter(function (p) { return p.stars === 5; }).length;
+
+    var tiles = el("div", "stats-grid");
+    tiles.appendChild(fichaResumen(String(points.length), points.length === 1 ? "punto" : "puntos"));
+    tiles.appendChild(fichaResumen(String(visitados), "visitados"));
+    tiles.appendChild(fichaResumen(String(pendientes), "pendientes"));
+    tiles.appendChild(fichaResumen(media ? media.toFixed(1).replace(".", ",") : "—", "media ★"));
+    tiles.appendChild(fichaResumen(String(cincoEstrellas), "de 5 ★"));
+    tiles.appendChild(fichaResumen(String(fotos), fotos === 1 ? "foto" : "fotos"));
+    cuerpo.appendChild(tiles);
+
+    // Por categoría
+    var porCat = {};
+    points.forEach(function (p) { porCat[p.cat] = (porCat[p.cat] || 0) + 1; });
+    var filasCat = Object.keys(porCat).map(function (id) {
+      var c = cat(id);
+      return { etiqueta: c.label, valor: porCat[id], color: c.color, emoji: c.emoji };
+    }).sort(function (a, b) { return b.valor - a.valor; });
+    if (filasCat.length) {
+      cuerpo.appendChild(barras("Por categoría", filasCat, filasCat[0].valor));
+    }
+
+    // Por lista
+    if (listas.length) {
+      var filasLista = listas.map(function (l) {
+        return {
+          etiqueta: l.nombre,
+          valor: points.filter(function (p) { return (p.lists || []).indexOf(l.id) !== -1; }).length
+        };
+      }).filter(function (f) { return f.valor > 0; })
+        .sort(function (a, b) { return b.valor - a.valor; });
+      if (filasLista.length) {
+        cuerpo.appendChild(barras("Por lista", filasLista, filasLista[0].valor));
+      }
+    }
+
+    // Añadidos por mes (últimos 12), solo si hay fechas
+    var conFecha = points.filter(function (p) { return p.created; });
+    if (conFecha.length >= 2) {
+      var meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+      var hoy = new Date();
+      var claves = [], cuenta = {};
+      for (var i = 11; i >= 0; i--) {
+        var d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+        var k = d.getFullYear() + "-" + d.getMonth();
+        claves.push({ k: k, etiqueta: meses[d.getMonth()] });
+        cuenta[k] = 0;
+      }
+      conFecha.forEach(function (p) {
+        var d = new Date(p.created);
+        var k = d.getFullYear() + "-" + d.getMonth();
+        if (cuenta[k] !== undefined) cuenta[k]++;
+      });
+      var maxMes = Math.max.apply(null, claves.map(function (c) { return cuenta[c.k]; }));
+      if (maxMes > 0) {
+        var sec = el("section", "chart");
+        sec.appendChild(el("h3", "chart-title", "Añadidos en los últimos 12 meses"));
+        var cols = el("div", "cols");
+        claves.forEach(function (c) {
+          var n = cuenta[c.k];
+          var col = el("div", "col");
+          col.title = c.etiqueta + ": " + n;
+          var caja = el("div", "col-track");
+          var f = el("div", "col-fill");
+          f.style.height = n ? Math.max(4, Math.round((n / maxMes) * 100)) + "%" : "0";
+          caja.appendChild(f);
+          col.appendChild(el("div", "col-val", n ? String(n) : ""));
+          col.appendChild(caja);
+          col.appendChild(el("div", "col-lab", c.etiqueta));
+          cols.appendChild(col);
+        });
+        sec.appendChild(cols);
+        cuerpo.appendChild(sec);
+      }
+    }
+
+    $("#stats-backdrop").hidden = false;
+    $("#stats-modal").hidden = false;
+  }
+  function cerrarResumen() {
+    $("#stats-modal").hidden = true;
+    $("#stats-backdrop").hidden = true;
+  }
+
+  // --- Listas del usuario ---------------------------------------------------
+  var listas = [];
+  var editandoLista = null;
+
+  function listaPorId(id) {
+    for (var i = 0; i < listas.length; i++) if (listas[i].id === id) return listas[i];
+    return null;
+  }
+  function guardarListas() {
+    if (!Store.getSettings) return Promise.resolve();
+    return Store.getSettings().then(function (a) {
+      a = a || {};
+      a.listas = listas.map(function (l) { return { id: l.id, nombre: l.nombre }; });
+      return Store.saveSettings(a);
+    });
+  }
+  function construirSelectorListas() {
+    var sel = $("#filter-list");
+    var previo = sel.value;
+    sel.innerHTML = "";
+    sel.appendChild(new Option("Todas", "todas"));
+    listas.forEach(function (l) { sel.appendChild(new Option(l.nombre, l.id)); });
+    if (listas.length) sel.appendChild(new Option("Sin lista", "sin"));
+    sel.value = (previo && sel.querySelector('option[value="' + previo + '"]')) ? previo : "todas";
+    filters.lista = sel.value;
+    $("#poi-lists-field").hidden = false;
+  }
+
+  // Chips para asignar el punto a una o varias listas
+  function construirListasEditor(seleccion) {
+    var box = $("#poi-lists");
+    box.innerHTML = "";
+    if (!listas.length) {
+      box.appendChild(el("span", "cats-help", "Aún no tienes listas."));
+      return;
+    }
+    listas.forEach(function (l) {
+      var b = el("button", "chip"); b.type = "button"; b.dataset.lista = l.id;
+      var activa = seleccion.indexOf(l.id) !== -1;
+      b.setAttribute("aria-pressed", activa ? "true" : "false");
+      b.appendChild(el("span", null, l.nombre));
+      b.addEventListener("click", function () {
+        var on = b.getAttribute("aria-pressed") === "true";
+        b.setAttribute("aria-pressed", on ? "false" : "true");
+      });
+      box.appendChild(b);
+    });
+  }
+  function listasSeleccionadas() {
+    var out = [];
+    document.querySelectorAll("#poi-lists .chip").forEach(function (b) {
+      if (b.getAttribute("aria-pressed") === "true") out.push(b.dataset.lista);
+    });
+    return out;
+  }
+
+  function abrirListas() {
+    editandoLista = null;
+    resetFormularioLista();
+    pintarListas();
+    $("#lists-backdrop").hidden = false;
+    $("#lists-modal").hidden = false;
+  }
+  function cerrarListas() {
+    $("#lists-modal").hidden = true;
+    $("#lists-backdrop").hidden = true;
+    // Si se abrió desde el editor, refrescar sus chips conservando lo marcado.
+    if (!$("#editor").hidden) construirListasEditor(listasSeleccionadas());
+  }
+  function resetFormularioLista() {
+    editandoLista = null;
+    $("#list-name").value = "";
+    $("#lists-form-title").textContent = "Nueva lista";
+    $("#list-submit").textContent = "Añadir";
+    $("#list-cancel").hidden = true;
+  }
+  function pintarListas() {
+    var ul = $("#lists-list");
+    ul.innerHTML = "";
+    if (!listas.length) {
+      ul.appendChild(el("li", "poi-empty", "Todavía no has creado ninguna lista."));
+      return;
+    }
+    listas.forEach(function (l) {
+      var li = el("li", "cats-item");
+      li.appendChild(el("span", "cats-item-name", l.nombre));
+      var usos = points.filter(function (p) { return (p.lists || []).indexOf(l.id) !== -1; }).length;
+      li.appendChild(el("span", "cats-item-count", usos ? usos + "" : ""));
+      var ed = el("button", "linkbtn", "Renombrar"); ed.type = "button";
+      ed.addEventListener("click", function () {
+        editandoLista = l.id;
+        $("#list-name").value = l.nombre;
+        $("#lists-form-title").textContent = "Renombrar lista";
+        $("#list-submit").textContent = "Guardar";
+        $("#list-cancel").hidden = false;
+        $("#list-name").focus();
+      });
+      var bo = el("button", "linkbtn cats-del", "Borrar"); bo.type = "button";
+      bo.addEventListener("click", function () { borrarLista(l.id); });
+      var acc = el("span", "cats-item-actions");
+      acc.appendChild(ed); acc.appendChild(bo);
+      li.appendChild(acc);
+      ul.appendChild(li);
+    });
+  }
+  function borrarLista(id) {
+    var afectados = points.filter(function (p) { return (p.lists || []).indexOf(id) !== -1; });
+    var aviso = afectados.length
+      ? "La lista tiene " + afectados.length + (afectados.length === 1 ? " punto" : " puntos") +
+        ". Los puntos NO se borran, solo dejan de pertenecer a ella. ¿Continuar?"
+      : "¿Borrar esta lista?";
+    if (!confirm(aviso)) return;
+
+    listas = listas.filter(function (l) { return l.id !== id; });
+    var pendientes = afectados.map(function (p) {
+      p.lists = (p.lists || []).filter(function (x) { return x !== id; });
+      return Store.update(p.id, p);
+    });
+    Promise.all(pendientes).then(guardarListas).then(function () {
+      construirSelectorListas();
+      pintarListas();
+      refresh();
+      toast("Lista borrada.");
+    }).catch(function () { toast("No se pudo borrar."); });
+  }
+  function enviarFormularioLista(e) {
+    e.preventDefault();
+    var nombre = $("#list-name").value.trim();
+    if (!nombre) { $("#list-name").focus(); return; }
+    var repetida = listas.some(function (l) {
+      return l.id !== editandoLista && l.nombre.toLowerCase() === nombre.toLowerCase();
+    });
+    if (repetida) { toast("Ya existe una lista con ese nombre."); return; }
+
+    var nuevaId = null;
+    if (editandoLista) {
+      listas.forEach(function (l) { if (l.id === editandoLista) l.nombre = nombre; });
+    } else {
+      nuevaId = "l" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      listas.push({ id: nuevaId, nombre: nombre });
+    }
+    var eraEdicion = !!editandoLista;
+    guardarListas().then(function () {
+      construirSelectorListas();
+      pintarListas();
+      resetFormularioLista();
+      // Creada desde el editor de un punto: se marca y se vuelve al punto.
+      if (nuevaId && !$("#editor").hidden) {
+        var sel = listasSeleccionadas(); sel.push(nuevaId);
+        construirListasEditor(sel);
+        cerrarListas();
+      }
+      refresh();
+      toast(eraEdicion ? "Lista renombrada." : "Lista creada.");
+    }).catch(function () { toast("No se pudo guardar."); });
   }
 
   // --- Mi cuenta y privacidad ----------------------------------------------
@@ -1304,9 +1609,10 @@
     box.hidden = false;
   }
   function resetFilters() {
-    filters.text = ""; filters.rating = 0; filters.status = "todos";
+    filters.text = ""; filters.rating = 0; filters.status = "todos"; filters.lista = "todas";
     CATEGORIES.forEach(function (c) { filters.cats[c.id] = true; });
     $("#filter-text").value = ""; $("#filter-rating").value = "0"; $("#filter-status").value = "todos";
+    $("#filter-list").value = "todas";
     sincronizarChips();
     refresh();
     if (viewMode === "all") scheduleDiscover();
@@ -1559,7 +1865,9 @@
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
-        if (!$("#privacy-modal").hidden) cerrarPrivacidad();
+        if (!$("#stats-modal").hidden) cerrarResumen();
+        else if (!$("#privacy-modal").hidden) cerrarPrivacidad();
+        else if (!$("#lists-modal").hidden) cerrarListas();
         else if (!$("#account-modal").hidden) cerrarCuenta();
         else if (!$("#cats-modal").hidden) cerrarCategorias();
         else if (!$("#editor").hidden) closeEditor();
@@ -1577,6 +1885,20 @@
       if (sortBy === "cercania" && !userPos) pedirUbicacion();
       renderList();
     });
+    $("#filter-list").addEventListener("change", function () { filters.lista = this.value; refresh(); });
+    $("#lists-manage").addEventListener("click", abrirListas);
+    $("#poi-list-new").addEventListener("click", abrirListas);
+    $("#lists-close").addEventListener("click", cerrarListas);
+    $("#lists-done").addEventListener("click", cerrarListas);
+    $("#lists-backdrop").addEventListener("click", cerrarListas);
+    $("#lists-form").addEventListener("submit", enviarFormularioLista);
+    $("#list-cancel").addEventListener("click", resetFormularioLista);
+
+    $("#btn-stats").addEventListener("click", abrirResumen);
+    $("#stats-close").addEventListener("click", cerrarResumen);
+    $("#stats-done").addEventListener("click", cerrarResumen);
+    $("#stats-backdrop").addEventListener("click", cerrarResumen);
+
     $("#btn-reset-filters").addEventListener("click", resetFilters);
 
     $("#btn-account").addEventListener("click", abrirCuenta);
@@ -1672,6 +1994,7 @@
     return cargarCategoriasPropias().then(function () {
       construirChips();
       construirSelectorCategoria();
+      construirSelectorListas();
       sincronizarChips();
       return Store.getAll();
     }).then(function (list) {
@@ -1681,9 +2004,10 @@
   }
   function clearData() {
     points = []; discovered = []; viewMode = "mine";
-    customCats = [];              // son privadas de cada cuenta
+    customCats = []; listas = [];   // son privadas de cada cuenta
+    filters.lista = "todas";
     reindexarCategorias();
-    construirChips(); construirSelectorCategoria(); sincronizarChips();
+    construirChips(); construirSelectorCategoria(); construirSelectorListas(); sincronizarChips();
     document.querySelector(".app").classList.remove("mode-all");
     refresh();
   }
