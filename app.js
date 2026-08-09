@@ -118,8 +118,6 @@
     root.style.setProperty("--accent-weak-2", "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ",0.24)");
     document.title = CFG.name;
     $("#brand-name").textContent = CFG.name;
-    var mh = $("#panel-mhead-title");
-    if (mh) mh.textContent = CFG.name;
     var ab = $("#auth-brand-name");
     if (ab) ab.textContent = CFG.name;
     if (!CFG.map.geocode || !CFG.map.geocode.enabled) $("#geosearch").hidden = true;
@@ -356,7 +354,6 @@
     var visible = ordenar(filteredItems().slice());
     $("#count-visible").textContent = visible.length;
     $("#count-total").textContent = activeSet().length;
-    $("#btn-reset-filters").hidden = !filtersActive();
 
     if (activeSet().length === 0) {
       if (viewMode === "mine") {
@@ -476,7 +473,7 @@
     document.querySelectorAll(".poi-card.is-open-left, .poi-card.is-open-right")
       .forEach(function (c) {
         if (c === excepto) return;
-        c.classList.remove("is-open-left", "is-open-right");
+        c.classList.remove("is-open-left", "is-open-right", "is-swiping");
         var i = c.querySelector(".poi-card-inner");
         if (i) i.style.transform = "";
       });
@@ -503,6 +500,7 @@
         // Si el gesto es mas vertical, se deja pasar para que la lista ruede.
         if (Math.abs(dx) <= Math.abs(dy)) { siguiendo = false; inner.style.transition = ""; return; }
         horizontal = true;
+        li.classList.add("is-swiping");
         if (li.setPointerCapture) { try { li.setPointerCapture(e.pointerId); } catch (err) {} }
         cerrarTarjetas(li);
       }
@@ -527,6 +525,12 @@
       } else {
         inner.style.transform = "";
       }
+      // Se mantiene visible mientras la tarjeta vuelve a su sitio.
+      setTimeout(function () {
+        if (!li.classList.contains("is-open-left") && !li.classList.contains("is-open-right")) {
+          li.classList.remove("is-swiping");
+        }
+      }, 240);
     }
     li.addEventListener("pointerup", soltar);
     li.addEventListener("pointercancel", soltar);
@@ -810,7 +814,6 @@
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
     $("#filter-text").placeholder = mode === "all" ? "Buscar en la zona…" : "Nombre, nota, lugar…";
-    $("#filter-text-label").textContent = mode === "all" ? "Buscar en la zona" : "Buscar en mis puntos";
     if (mode === "all") { refresh(); scheduleDiscover(); }
     else { setDiscoverStatus(""); refresh(); }
   }
@@ -1074,6 +1077,43 @@
       var o = el("option", null, c.emoji + "  " + c.label); o.value = c.id; sel.appendChild(o);
     });
     if (previo && CAT_BY_ID[previo]) sel.value = previo;
+  }
+
+  // --- Hoja de filtros ------------------------------------------------------
+  function abrirFiltros() {
+    actualizarResultadoFiltros();
+    $("#filters-backdrop").hidden = false;
+    $("#filters-sheet").hidden = false;
+  }
+  function cerrarFiltros() {
+    $("#filters-sheet").hidden = true;
+    $("#filters-backdrop").hidden = true;
+  }
+  // Cuántos filtros hay puestos: sirve para la insignia del botón. La búsqueda
+  // por texto no cuenta, porque se ve escrita en su propio campo.
+  function filtrosPuestos() {
+    var n = 0;
+    if (CATEGORIES.some(function (c) { return !filters.cats[c.id]; })) n++;
+    if (filters.rating > 0) n++;
+    if (viewMode === "mine") {
+      if (filters.status !== "todos") n++;
+      if (filters.lista !== "todas") n++;
+    }
+    return n;
+  }
+  function actualizarBotonFiltros() {
+    var n = filtrosPuestos();
+    var b = $("#btn-filters"), ins = $("#filters-count");
+    b.classList.toggle("has-filters", n > 0);
+    ins.hidden = n === 0;
+    ins.textContent = String(n);
+    b.setAttribute("aria-label", n ? "Filtros, " + n + " puestos" : "Filtros");
+    $("#btn-reset-filters").hidden = n === 0 && !filters.text;
+    actualizarResultadoFiltros();
+  }
+  function actualizarResultadoFiltros() {
+    var r = $("#filters-result");
+    if (r) r.textContent = String(filteredItems().length);
   }
 
   // --- Resumen -------------------------------------------------------------
@@ -1588,7 +1628,7 @@
       var o = el("option", null, s.label + "s"); o.value = s.id; fs.appendChild(o);
     });
   }
-  function refresh() { renderMarkers(); renderList(); updateMapEmpty(); }
+  function refresh() { renderMarkers(); renderList(); updateMapEmpty(); actualizarBotonFiltros(); }
 
   // Aviso sobre el mapa cuando estás en "Mis PDI" y todavía no has guardado
   // nada: sin él, el mapa vacío parece un error.
@@ -1865,7 +1905,8 @@
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
-        if (!$("#stats-modal").hidden) cerrarResumen();
+        if (!$("#filters-sheet").hidden) cerrarFiltros();
+        else if (!$("#stats-modal").hidden) cerrarResumen();
         else if (!$("#privacy-modal").hidden) cerrarPrivacidad();
         else if (!$("#lists-modal").hidden) cerrarListas();
         else if (!$("#account-modal").hidden) cerrarCuenta();
@@ -1893,6 +1934,11 @@
     $("#lists-backdrop").addEventListener("click", cerrarListas);
     $("#lists-form").addEventListener("submit", enviarFormularioLista);
     $("#list-cancel").addEventListener("click", resetFormularioLista);
+
+    $("#btn-filters").addEventListener("click", abrirFiltros);
+    $("#filters-close").addEventListener("click", cerrarFiltros);
+    $("#filters-done").addEventListener("click", cerrarFiltros);
+    $("#filters-backdrop").addEventListener("click", cerrarFiltros);
 
     $("#btn-stats").addEventListener("click", abrirResumen);
     $("#stats-close").addEventListener("click", cerrarResumen);

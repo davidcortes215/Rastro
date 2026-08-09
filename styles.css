@@ -150,15 +150,41 @@ input, select, textarea { font-family: inherit; }
 }
 .panel.is-hidden { margin-left: calc(-1 * var(--panel-w)); }
 
-/* Cabecera del panel: solo visible en móvil */
+/* Franja superior del panel: aloja los modos de vista. El nombre de la app
+   no se repite aquí: ya está en la barra y dentro no aporta. */
 .panel-mhead {
-  display: none;
-  align-items: center; justify-content: space-between;
-  padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.7rem; border-bottom: 1px solid var(--line);
 }
-.panel-mhead-title { font-weight: 700; font-size: 1rem; }
-.panel-close { background: none; border: none; font-size: 1.7rem; line-height: 1; color: var(--ink-soft); width: 2rem; }
+.panel-mhead .mode-toggle { flex: 1 1 auto; }
+.panel-close {
+  background: none; border: none; font-size: 1.7rem; line-height: 1;
+  color: var(--ink-soft); width: 2rem; flex: 0 0 auto;
+  display: none;                 /* en escritorio el panel no se cierra desde aquí */
+}
 .panel-close:hover { color: var(--ink); }
+
+/* Buscar + acceso a los filtros */
+.panel-toolbar {
+  display: flex; gap: 0.45rem; padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+.panel-toolbar .field-input { flex: 1 1 auto; }
+.btn-filters {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 0.35rem;
+  height: 40px; padding: 0 0.85rem; border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong); background: var(--surface);
+  color: var(--ink); font-size: 0.86rem; font-weight: 600;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.btn-filters:hover { border-color: var(--accent); color: var(--accent); }
+.btn-filters.has-filters { background: var(--accent); border-color: transparent; color: #fff; }
+.filters-badge {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25); color: #fff;
+  font-family: var(--mono); font-size: 0.68rem; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
 
 .panel-backdrop {
   position: fixed; inset: var(--topbar-h) 0 0 0;
@@ -257,8 +283,13 @@ select.field-input { cursor: pointer; }
 .poi-card:hover .poi-card-inner { background: var(--surface-2); }
 .poi-card.is-active .poi-card-inner { background: var(--accent-weak); box-shadow: inset 3px 0 0 var(--accent); }
 
-/* Acciones que se destapan al deslizar */
-.poi-card-act { position: absolute; top: 0; bottom: 0; display: flex; }
+/* Acciones que se destapan al deslizar. Ocultas mientras la tarjeta está en
+   reposo: si no, por redondeo de subpíxeles asoman como una raya de color
+   bajo el borde inferior. */
+.poi-card-act { position: absolute; top: 0; bottom: 0; display: flex; visibility: hidden; }
+.poi-card.is-swiping .poi-card-act,
+.poi-card.is-open-left .poi-card-act--del,
+.poi-card.is-open-right .poi-card-act--edit { visibility: visible; }
 .poi-card-act--edit { left: 0; background: var(--accent); }
 .poi-card-act--del { right: 0; background: #c62828; }
 .poi-card-act button {
@@ -483,6 +514,22 @@ select.field-input { cursor: pointer; }
   flex: 0 0 auto; border: 1px solid var(--line);
 }
 
+/* Hoja de filtros */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 1500; background: rgba(15, 15, 18, 0.5);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.sheet {
+  position: fixed; z-index: 1550;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(452px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem);
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--elev-3);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sheet-grab { display: none; }
+.sheet .editor-body { overflow-y: auto; }
+.sheet .editor-foot { justify-content: space-between; }
+
 /* Diálogo de categorías: por encima del editor de puntos, para poder crear
    una categoría sin cerrar el punto que se está registrando. */
 #cats-backdrop { z-index: 1400; }
@@ -691,5 +738,21 @@ select.field-input { cursor: pointer; }
     transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .panel.is-hidden { transform: translateX(-102%); margin-left: 0; }
-  .panel-mhead { display: flex; }
+  .panel-close { display: block; }
+
+  /* En móvil los filtros suben desde abajo, como una hoja */
+  .sheet {
+    top: auto; bottom: 0; left: 0; transform: none;
+    width: 100%; max-width: none; max-height: 86dvh;
+    border-radius: 16px 16px 0 0;
+    animation: sube-hoja .32s cubic-bezier(.3, .9, .3, 1);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .sheet-grab { display: block; padding: 0.5rem 0 0.15rem; }
+  .sheet-grab::after {
+    content: ""; display: block; width: 38px; height: 4px; margin: 0 auto;
+    border-radius: 2px; background: var(--line-strong);
+  }
+  @keyframes sube-hoja { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
 }

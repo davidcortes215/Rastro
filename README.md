@@ -59,7 +59,10 @@ servidor propio en esta primera fase.
   responsable tomados de `legal` en `config.js`.
 - **Instalable como app** (PWA): se añade a la pantalla de inicio, se abre a
   pantalla completa sin barra del navegador y arranca sin conexión.
-- **Responsive**: panel lateral en escritorio, pantalla completa en móvil.
+- **Responsive**: panel lateral en escritorio, pantalla completa en móvil. Los
+  filtros viven en una hoja aparte —hoja inferior en móvil, diálogo centrado en
+  escritorio— con una insignia que indica cuántos hay puestos, de modo que el
+  panel queda casi entero para la lista.
 - **White-label**: marca, color, mapa y categorías se configuran en un solo archivo.
 
 ---

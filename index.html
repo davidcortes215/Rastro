@@ -56,76 +56,25 @@
 
       <!-- Panel: filtros + lista -->
       <aside class="panel" id="panel" aria-label="Filtros y listado de puntos">
+        <!-- Franja superior: modos de vista (sustituye al nombre de la app) -->
         <div class="panel-mhead">
-          <span class="panel-mhead-title" id="panel-mhead-title">Rastro</span>
-          <button type="button" class="panel-close" id="panel-close" aria-label="Cerrar panel">&times;</button>
-        </div>
-        <div class="panel-section panel-section--mode">
           <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Modo de vista">
             <button type="button" class="mode-btn is-on" data-mode="mine" aria-pressed="true">Mis PDI</button>
             <button type="button" class="mode-btn" data-mode="all" aria-pressed="false">Todos&nbsp;(España)</button>
           </div>
+          <button type="button" class="panel-close" id="panel-close" aria-label="Cerrar panel">&times;</button>
         </div>
 
-        <div class="panel-section">
-          <label class="label" for="filter-text" id="filter-text-label">Buscar en mis puntos</label>
-          <input type="search" class="field-input" id="filter-text" placeholder="Nombre, nota, lugar…">
-        </div>
-
-        <div class="panel-section">
-          <div class="panel-section-head">
-            <span class="label">Categorías</span>
-            <span class="panel-head-actions">
-              <button type="button" class="linkbtn" id="cats-manage">Editar</button>
-              <button type="button" class="linkbtn" id="cats-toggle-all">Todas</button>
-            </span>
-          </div>
-          <div class="chips" id="filter-cats" role="group" aria-label="Filtrar por categoría"></div>
-        </div>
-
-        <div class="panel-section panel-section--row">
-          <div class="minirow">
-            <label class="label" for="filter-rating">Valoración mín.</label>
-            <select class="field-input" id="filter-rating">
-              <option value="0">Todas</option>
-              <option value="1">★ 1+</option>
-              <option value="2">★ 2+</option>
-              <option value="3">★ 3+</option>
-              <option value="4">★ 4+</option>
-              <option value="5">★ 5</option>
-            </select>
-          </div>
-          <div class="minirow">
-            <label class="label" for="filter-status">Estado</label>
-            <select class="field-input" id="filter-status">
-              <option value="todos">Todos</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="panel-section">
-          <div class="panel-section-head">
-            <span class="label">Lista</span>
-            <button type="button" class="linkbtn" id="lists-manage">Editar</button>
-          </div>
-          <select class="field-input" id="filter-list">
-            <option value="todas">Todas</option>
-          </select>
-        </div>
-
-        <div class="panel-section">
-          <label class="label" for="sort-by">Ordenar por</label>
-          <select class="field-input" id="sort-by">
-            <option value="valoracion">Valoración</option>
-            <option value="cercania">Cercanía</option>
-            <option value="nombre">Nombre</option>
-            <option value="recientes">Añadidos recientemente</option>
-          </select>
+        <div class="panel-toolbar">
+          <input type="search" class="field-input" id="filter-text" placeholder="Nombre, nota, lugar…"
+                 aria-label="Buscar en mis puntos">
+          <button type="button" class="btn-filters" id="btn-filters" aria-haspopup="dialog">
+            Filtros<span class="filters-badge" id="filters-count" hidden>0</span>
+          </button>
         </div>
 
         <div class="panel-count">
           <span id="count-visible">0</span> de <span id="count-total">0</span> puntos
-          <button type="button" class="linkbtn" id="btn-reset-filters" hidden>Limpiar filtros</button>
           <button type="button" class="linkbtn" id="btn-stats">Resumen</button>
         </div>
 
@@ -309,6 +258,76 @@
     <div class="editor-foot">
       <div class="editor-foot-right">
         <button type="button" class="btn btn--ghost" id="privacy-done">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hoja de filtros -->
+  <div class="sheet-backdrop" id="filters-backdrop" hidden></div>
+  <div class="sheet" id="filters-sheet" role="dialog" aria-modal="true" aria-labelledby="filters-title" hidden>
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <div class="editor-head">
+      <h2 id="filters-title">Filtros</h2>
+      <button type="button" class="editor-close" id="filters-close" aria-label="Cerrar">&times;</button>
+    </div>
+
+    <div class="editor-body">
+      <div class="field">
+        <div class="panel-section-head">
+          <span class="label">Categorías</span>
+          <span class="panel-head-actions">
+            <button type="button" class="linkbtn" id="cats-manage">Editar</button>
+            <button type="button" class="linkbtn" id="cats-toggle-all">Todas</button>
+          </span>
+        </div>
+        <div class="chips" id="filter-cats" role="group" aria-label="Filtrar por categoría"></div>
+      </div>
+
+      <div class="field panel-section--row">
+        <div class="minirow">
+          <label class="label" for="filter-rating">Valoración mín.</label>
+          <select class="field-input" id="filter-rating">
+            <option value="0">Todas</option>
+            <option value="1">★ 1+</option>
+            <option value="2">★ 2+</option>
+            <option value="3">★ 3+</option>
+            <option value="4">★ 4+</option>
+            <option value="5">★ 5</option>
+          </select>
+        </div>
+        <div class="minirow">
+          <label class="label" for="filter-status">Estado</label>
+          <select class="field-input" id="filter-status">
+            <option value="todos">Todos</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="panel-section-head">
+          <span class="label">Lista</span>
+          <button type="button" class="linkbtn" id="lists-manage">Editar</button>
+        </div>
+        <select class="field-input" id="filter-list">
+          <option value="todas">Todas</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="sort-by">Ordenar por</label>
+        <select class="field-input" id="sort-by">
+          <option value="valoracion">Valoración</option>
+          <option value="cercania">Cercanía</option>
+          <option value="nombre">Nombre</option>
+          <option value="recientes">Añadidos recientemente</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="editor-foot">
+      <button type="button" class="linkbtn" id="btn-reset-filters" hidden>Limpiar filtros</button>
+      <div class="editor-foot-right">
+        <button type="button" class="btn btn--solid" id="filters-done">Ver <span id="filters-result">0</span> puntos</button>
       </div>
     </div>
   </div>
