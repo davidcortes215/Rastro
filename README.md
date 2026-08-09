@@ -46,6 +46,12 @@ servidor propio en esta primera fase.
   el mapa con su nombre y un botón para guardarlo, con la categoría deducida
   del tipo de sitio.
 - **Exportar / importar** los datos en JSON (copia de seguridad y traspaso de dispositivo).
+- **Cómo llegar**: abre la ruta hasta el punto en Apple Maps o Google Maps
+  según el dispositivo (configurable en `navigation`).
+- **Cuenta**: recuperación de contraseña por correo, resumen de la cuenta y
+  **borrado de la cuenta y todos sus datos** (RGPD).
+- **Aviso de privacidad** consultable antes de registrarse, con los datos del
+  responsable tomados de `legal` en `config.js`.
 - **Instalable como app** (PWA): se añade a la pantalla de inicio, se abre a
   pantalla completa sin barra del navegador y arranca sin conexión.
 - **Responsive**: panel lateral en escritorio, pantalla completa en móvil.
@@ -220,6 +226,37 @@ Store.replaceAll(points)  // → Promise<void>
 
    Sin esta tabla la app sigue funcionando: simplemente no se guardan las
    categorías propias en la nube.
+
+7. Para que cada usuario pueda **borrar su cuenta** (exigible por el RGPD),
+   crea esta función. La clave pública no puede eliminar usuarios, así que se
+   usa una función que solo borra a quien la invoca:
+
+   ```sql
+   create or replace function public.delete_own_account()
+   returns void
+   language plpgsql
+   security definer
+   set search_path = public
+   as $$
+   begin
+     if auth.uid() is null then
+       raise exception 'sin sesion';
+     end if;
+     delete from auth.users where id = auth.uid();
+   end;
+   $$;
+
+   revoke all on function public.delete_own_account() from public, anon;
+   grant execute on function public.delete_own_account() to authenticated;
+   ```
+
+   Al borrarse el usuario, sus puntos y ajustes desaparecen por cascada; la
+   app elimina antes sus fotos de Storage.
+
+8. Para el **correo de recuperación de contraseña**, en
+   **Authentication → URL Configuration** pon la dirección de la app en
+   *Site URL* y añádela también en *Redirect URLs*. Sin esto, el enlace del
+   correo no devuelve al usuario a la aplicación.
 
 Las claves `anon` son **públicas por diseño**: la seguridad la garantizan las
 políticas RLS (cada usuario solo accede a sus filas). Para volver al modo local,

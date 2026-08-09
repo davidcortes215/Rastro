@@ -146,6 +146,18 @@
     });
   }
 
+  // --- Navegación hasta un punto -------------------------------------------
+  function urlComoLlegar(p) {
+    var modo = CFG.navigation || "auto";
+    var esApple = modo === "apple" ||
+      (modo === "auto" && /iphone|ipad|ipod|macintosh/i.test(navigator.userAgent));
+    var destino = p.lat + "," + p.lng;
+    var nombre = encodeURIComponent(p.name || "");
+    return esApple
+      ? "https://maps.apple.com/?daddr=" + destino + "&q=" + nombre
+      : "https://www.google.com/maps/dir/?api=1&destination=" + destino;
+  }
+
   // --- Mapa ---------------------------------------------------------------
   function mapStyles() {
     if (CFG.map.styles && CFG.map.styles.length) return CFG.map.styles;
@@ -286,7 +298,8 @@
         '<div class="popup-name">' + escapeHtml(p.name) + "</div>" +
         '<div class="popup-meta">' + escapeHtml(c.label) + " · OpenStreetMap</div>" +
         '<div class="popup-actions">' +
-          '<button type="button" data-act="save">＋ Guardar en mis puntos</button>' +
+          '<button type="button" data-act="save">＋ Guardar</button>' +
+          '<button type="button" data-act="ir">Cómo llegar</button>' +
         "</div></div>";
     }
     var meta = c.label + (p.status === "pendiente" ? " · " + statusLabel("pendiente").toLowerCase() : "");
@@ -305,6 +318,7 @@
       fotos +
       notes +
       '<div class="popup-actions">' +
+        '<button type="button" data-act="ir">Cómo llegar</button>' +
         '<button type="button" data-act="edit">Editar</button>' +
         '<button type="button" data-act="delete">Eliminar</button>' +
       "</div></div>";
@@ -314,6 +328,8 @@
     if (!node) return;
     var p = itemById(id);
     if (!p) return;
+    var ir = node.querySelector('[data-act="ir"]');
+    if (ir) ir.onclick = function () { window.open(urlComoLlegar(p), "_blank", "noopener"); };
     if (p.osm) {
       node.querySelector('[data-act="save"]').onclick = function () {
         map.closePopup();
@@ -1052,6 +1068,79 @@
     if (previo && CAT_BY_ID[previo]) sel.value = previo;
   }
 
+  // --- Mi cuenta y privacidad ----------------------------------------------
+  function abrirCuenta() {
+    var s = window.RastroCuenta || {};
+    $("#account-mail").textContent = s.email || "Sesión iniciada";
+    var fotos = points.reduce(function (n, p) { return n + ((p.photos && p.photos.length) || 0); }, 0);
+    $("#account-stats").textContent =
+      points.length + (points.length === 1 ? " punto guardado" : " puntos guardados") +
+      (fotos ? " · " + fotos + (fotos === 1 ? " foto" : " fotos") : "");
+    $("#account-backdrop").hidden = false;
+    $("#account-modal").hidden = false;
+  }
+  function cerrarCuenta() {
+    $("#account-modal").hidden = true;
+    $("#account-backdrop").hidden = true;
+  }
+
+  function textoLegal() {
+    var L = CFG.legal || {};
+    var quien = L.responsable ? escapeHtml(L.responsable) : "el titular de esta aplicación";
+    var contacto = L.contacto
+      ? '<a href="mailto:' + escapeHtml(L.contacto) + '">' + escapeHtml(L.contacto) + "</a>"
+      : "el canal de contacto que se te haya facilitado";
+    var donde = escapeHtml(L.ubicacionDatos || "la Unión Europea");
+    return "" +
+      "<h3>Quién trata tus datos</h3>" +
+      "<p>El responsable del tratamiento es " + quien + ". Para cualquier consulta " +
+      "sobre tus datos puedes escribir a " + contacto + ".</p>" +
+
+      "<h3>Qué datos guardamos</h3>" +
+      "<ul>" +
+        "<li><b>Tu correo electrónico</b> y una versión cifrada de tu contraseña, para poder identificarte.</li>" +
+        "<li><b>Los puntos que creas</b>: nombre, coordenadas, categoría, valoración, estado y tus notas.</li>" +
+        "<li><b>Las fotos</b> que añadas a esos puntos.</li>" +
+        "<li><b>Tu ubicación</b>, solo si das permiso, y únicamente para centrar el mapa y calcular distancias. " +
+        "No se almacena ni se envía a ningún sitio: se usa en tu dispositivo y se descarta.</li>" +
+      "</ul>" +
+
+      "<h3>Para qué</h3>" +
+      "<p>Únicamente para prestarte el servicio: guardar tus lugares y mostrártelos " +
+      "cuando entras con tu cuenta. No se usan con fines publicitarios ni se elaboran perfiles.</p>" +
+
+      "<h3>Quién puede verlos</h3>" +
+      "<p>Tus puntos, notas, fotos y categorías son <b>privados</b>: solo los ve tu cuenta. " +
+      "No se ceden a terceros ni se venden.</p>" +
+
+      "<h3>Dónde se guardan</h3>" +
+      "<p>En servidores de Supabase situados en " + donde + ". Los mapas se muestran con " +
+      "OpenStreetMap y servicios asociados, que reciben las coordenadas de la zona que estás " +
+      "viendo para poder dibujar el mapa.</p>" +
+
+      "<h3>Cuánto tiempo</h3>" +
+      "<p>Mientras mantengas la cuenta. Si la borras, tus datos se eliminan.</p>" +
+
+      "<h3>Tus derechos</h3>" +
+      "<p>Puedes acceder a tus datos y llevártelos en cualquier momento con <b>Exportar</b>, " +
+      "corregirlos editando cada punto, y <b>borrar tu cuenta y todos tus datos</b> desde " +
+      "«Mi cuenta». También puedes reclamar ante la Agencia Española de Protección de Datos " +
+      "si consideras que no se respetan tus derechos.</p>" +
+
+      "<h3>Cookies</h3>" +
+      "<p>No se usan cookies publicitarias ni de seguimiento. Solo se guarda en tu navegador " +
+      "lo imprescindible para mantener la sesión y tus preferencias (estilo de mapa y orden).</p>";
+  }
+  function abrirPrivacidad() {
+    $("#privacy-body").innerHTML = textoLegal();
+    $("#privacy-backdrop").hidden = false;
+    $("#privacy-modal").hidden = false;
+  }
+  function cerrarPrivacidad() {
+    $("#privacy-modal").hidden = true;
+    $("#privacy-backdrop").hidden = true;
+  }
+
   // --- Diálogo de categorías ------------------------------------------------
   var editandoCat = null;   // id de la categoría propia en edición
   var nuevaCatId = null;    // id de la última creada, para seleccionarla
@@ -1396,7 +1485,8 @@
         '<div class="popup-name">' + escapeHtml(nombre) + "</div>" +
         '<div class="popup-meta">' + escapeHtml(cat(item.cat).label) + " · resultado de búsqueda</div>" +
         '<div class="popup-actions">' +
-          '<button type="button" data-act="save">＋ Guardar en mis puntos</button>' +
+          '<button type="button" data-act="save">＋ Guardar</button>' +
+          '<button type="button" data-act="ir">Cómo llegar</button>' +
           '<button type="button" data-act="close">Quitar</button>' +
         "</div></div>");
 
@@ -1406,6 +1496,9 @@
       nodo.querySelector('[data-act="save"]').onclick = function () {
         map.closePopup();
         openEditor(null, item.lat, item.lon, { name: nombre, cat: item.cat });
+      };
+      nodo.querySelector('[data-act="ir"]').onclick = function () {
+        window.open(urlComoLlegar({ lat: item.lat, lng: item.lon, name: nombre }), "_blank", "noopener");
       };
       nodo.querySelector('[data-act="close"]').onclick = function () {
         map.closePopup();
@@ -1466,7 +1559,9 @@
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
-        if (!$("#cats-modal").hidden) cerrarCategorias();
+        if (!$("#privacy-modal").hidden) cerrarPrivacidad();
+        else if (!$("#account-modal").hidden) cerrarCuenta();
+        else if (!$("#cats-modal").hidden) cerrarCategorias();
         else if (!$("#editor").hidden) closeEditor();
         else if (addMode) setAddMode(false);
       }
@@ -1483,6 +1578,16 @@
       renderList();
     });
     $("#btn-reset-filters").addEventListener("click", resetFilters);
+
+    $("#btn-account").addEventListener("click", abrirCuenta);
+    $("#account-close").addEventListener("click", cerrarCuenta);
+    $("#account-done").addEventListener("click", cerrarCuenta);
+    $("#account-backdrop").addEventListener("click", cerrarCuenta);
+    $("#account-privacy").addEventListener("click", abrirPrivacidad);
+    $("#auth-privacy").addEventListener("click", abrirPrivacidad);
+    $("#privacy-close").addEventListener("click", cerrarPrivacidad);
+    $("#privacy-done").addEventListener("click", cerrarPrivacidad);
+    $("#privacy-backdrop").addEventListener("click", cerrarPrivacidad);
 
     $("#cats-manage").addEventListener("click", abrirCategorias);
     $("#poi-cat-new").addEventListener("click", abrirCategorias);
@@ -1583,5 +1688,6 @@
     refresh();
   }
 
-  window.RastroApp = { start: start, loadPoints: loadPoints, clearData: clearData };
+  window.RastroApp = { start: start, loadPoints: loadPoints, clearData: clearData,
+    cerrarCuenta: cerrarCuenta, abrirPrivacidad: abrirPrivacidad, puntos: function () { return points; } };
 })();

@@ -125,7 +125,7 @@
           <button type="button" class="linkbtn" id="btn-import">Importar</button>
           <input type="file" id="import-file" accept="application/json" hidden>
           <button type="button" class="linkbtn" id="btn-install" hidden>Instalar app</button>
-          <button type="button" class="linkbtn panel-footer-end" id="btn-logout" hidden>Cerrar sesión</button>
+          <button type="button" class="linkbtn panel-footer-end" id="btn-account" hidden>Mi cuenta</button>
         </div>
       </aside>
 
@@ -249,6 +249,53 @@
     </div>
   </div>
 
+  <!-- Mi cuenta -->
+  <div class="editor-backdrop" id="account-backdrop" hidden></div>
+  <div class="editor" id="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title" hidden>
+    <div class="editor-head">
+      <h2 id="account-title">Mi cuenta</h2>
+      <button type="button" class="editor-close" id="account-close" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="editor-body">
+      <p class="account-mail" id="account-mail"></p>
+      <p class="account-note" id="account-stats"></p>
+
+      <div class="account-actions">
+        <button type="button" class="btn btn--ghost" id="btn-logout">Cerrar sesión</button>
+        <button type="button" class="linkbtn" id="account-privacy">Privacidad y aviso legal</button>
+      </div>
+
+      <div class="account-danger">
+        <span class="label">Borrar mi cuenta</span>
+        <p class="account-note">
+          Se eliminarán tu cuenta, tus puntos, tus notas, tus fotos y tus
+          categorías. Es irreversible: exporta tus datos antes si quieres conservarlos.
+        </p>
+        <button type="button" class="btn btn--danger" id="btn-delete-account">Borrar mi cuenta y mis datos</button>
+      </div>
+    </div>
+    <div class="editor-foot">
+      <div class="editor-foot-right">
+        <button type="button" class="btn btn--ghost" id="account-done">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacidad y aviso legal -->
+  <div class="editor-backdrop" id="privacy-backdrop" hidden></div>
+  <div class="editor" id="privacy-modal" role="dialog" aria-modal="true" aria-labelledby="privacy-title" hidden>
+    <div class="editor-head">
+      <h2 id="privacy-title">Privacidad y aviso legal</h2>
+      <button type="button" class="editor-close" id="privacy-close" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="editor-body legal" id="privacy-body"></div>
+    <div class="editor-foot">
+      <div class="editor-foot-right">
+        <button type="button" class="btn btn--ghost" id="privacy-done">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <!-- Pantalla de registro / inicio de sesión (solo visible en modo nube) -->
@@ -261,7 +308,7 @@
         <span class="auth-brand-name" id="auth-brand-name">Rastro</span>
       </div>
       <h1 class="auth-title" id="auth-title">Entrar</h1>
-      <p class="auth-sub">Guarda y sincroniza tus lugares en tu cuenta.</p>
+      <p class="auth-sub" id="auth-sub">Guarda y sincroniza tus lugares en tu cuenta.</p>
       <form id="auth-form" class="auth-form">
         <input type="email" id="auth-email" class="field-input" placeholder="Correo electrónico" autocomplete="email" required>
         <input type="password" id="auth-password" class="field-input" placeholder="Contraseña" autocomplete="current-password" required>
@@ -271,6 +318,12 @@
       <p class="auth-switch">
         <span id="auth-switch-text">¿No tienes cuenta?</span>
         <button type="button" class="linkbtn" id="auth-switch-btn">Crear cuenta</button>
+      </p>
+      <p class="auth-alt">
+        <button type="button" class="linkbtn" id="auth-forgot">He olvidado mi contraseña</button>
+      </p>
+      <p class="auth-legal">
+        <button type="button" class="linkbtn" id="auth-privacy">Privacidad y aviso legal</button>
       </p>
     </div>
   </div>

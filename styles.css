@@ -487,6 +487,12 @@ select.field-input { cursor: pointer; }
    una categoría sin cerrar el punto que se está registrando. */
 #cats-backdrop { z-index: 1400; }
 #cats-modal { z-index: 1450; }
+#account-backdrop { z-index: 1400; }
+#account-modal { z-index: 1450; }
+/* Privacidad se consulta también desde la pantalla de acceso (z-index 2000),
+   así que va por encima de todo. */
+#privacy-backdrop { z-index: 2100; }
+#privacy-modal { z-index: 2150; }
 
 .panel-head-actions { display: inline-flex; gap: 0.75rem; }
 
@@ -570,6 +576,34 @@ select.field-input { cursor: pointer; }
 .auth-submit { height: 44px; width: 100%; justify-content: center; font-size: 0.95rem; margin-top: 0.2rem; }
 .auth-error { color: var(--accent); font-size: 0.82rem; min-height: 1.1rem; margin: 0.1rem 0; }
 .auth-switch { margin-top: 1rem; font-size: 0.88rem; color: var(--ink-soft); text-align: center; }
+.auth-alt { margin-top: 0.55rem; text-align: center; }
+.auth-alt .linkbtn { font-family: var(--sans); font-size: 0.82rem; text-transform: none; letter-spacing: 0; color: var(--ink-soft); }
+.auth-alt .linkbtn:hover { color: var(--accent); }
+.auth-legal { margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--line); text-align: center; }
+.auth-legal .linkbtn { font-family: var(--sans); font-size: 0.78rem; text-transform: none; letter-spacing: 0; color: var(--ink-faint); }
+.auth-legal .linkbtn:hover { color: var(--accent); }
+
+/* Mi cuenta */
+.account-mail { font-size: 1rem; font-weight: 600; }
+.account-note { font-size: 0.83rem; color: var(--ink-soft); line-height: 1.5; margin-top: 0.25rem; }
+.account-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  margin: 1.1rem 0; padding-bottom: 1.1rem; border-bottom: 1px solid var(--line);
+}
+.account-actions .btn--ghost { color: var(--ink); background: var(--surface); border-color: var(--line-strong); width: auto; padding: 0 0.95rem; }
+.account-danger .label { color: #c62828; margin-bottom: 0.3rem; }
+.account-danger .btn { margin-top: 0.7rem; }
+.account-danger .btn--danger { color: #c62828; border-color: #c62828; }
+.account-danger .btn--danger:hover { background: #c62828; color: #fff; }
+
+/* Texto legal */
+.legal h3 { font-size: 0.92rem; margin: 1.1rem 0 0.35rem; }
+.legal h3:first-child { margin-top: 0; }
+.legal p, .legal li { font-size: 0.86rem; color: var(--ink-soft); line-height: 1.6; }
+.legal ul { padding-left: 1.1rem; margin: 0.35rem 0; }
+.legal li { margin-bottom: 0.25rem; }
+.legal b { color: var(--ink); }
+.legal a { color: var(--accent); }
 .auth-switch .linkbtn { font-family: var(--sans); font-size: 0.88rem; text-transform: none; letter-spacing: 0; font-weight: 600; }
 
 /* --------------------------------------------------------------------------
@@ -580,7 +614,7 @@ select.field-input { cursor: pointer; }
   bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   background: var(--negro); color: var(--blanco);
   padding: 0.65rem 1.2rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500;
-  z-index: 1500; box-shadow: var(--elev-3); max-width: calc(100vw - 2rem);
+  z-index: 2200; box-shadow: var(--elev-3); max-width: calc(100vw - 2rem);
 }
 
 /* --------------------------------------------------------------------------

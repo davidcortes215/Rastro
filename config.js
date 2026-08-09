@@ -30,6 +30,17 @@ window.APP_CONFIG = {
     photoBucket: "fotos"   // depósito de Supabase Storage donde van las fotos
   },
 
+  /* Navegación hasta un punto ---------------------------------------------- */
+  /* "auto" usa Apple Maps en iPhone y Google Maps en el resto. */
+  navigation: "auto",            // "auto" | "google" | "apple"
+
+  /* Datos del responsable, para el aviso de privacidad --------------------- */
+  legal: {
+    responsable: "",             // nombre o razón social; vacío = texto genérico
+    contacto: "",                // correo de contacto para ejercer derechos
+    ubicacionDatos: "Unión Europea"
+  },
+
   /* Fotos de cada punto ---------------------------------------------------- */
   photos: {
     enabled: true,
