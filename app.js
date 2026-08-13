@@ -264,6 +264,12 @@
     }
 
     cont.addEventListener("pointerdown", function (e) {
+      // Un dedo que llega mientras ya hay otro apoyado es un pellizco para hacer
+      // zoom, no una pulsación larga. Y en cualquier caso, antes de empezar una
+      // cuenta atrás nueva hay que apagar la anterior: si no, queda suelta y
+      // salta después, cuando el usuario ya ha levantado los dedos.
+      cancelar();
+      if (!e.isPrimary) return;
       if (addMode) return;                       // en modo añadir basta con tocar
       if (e.pointerType === "mouse" && e.button !== 0) return;
       // Ni sobre chinchetas, ni globos, ni los controles del mapa.
@@ -294,6 +300,8 @@
     ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) {
       cont.addEventListener(ev, cancelar);
     });
+    // Si el mapa se mueve o se acerca, el gesto era de navegación.
+    map.on("movestart zoomstart dragstart", cancelar);
     // Evita el menú del sistema al mantener pulsado.
     cont.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
