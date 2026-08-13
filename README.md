@@ -26,7 +26,9 @@ servidor propio en esta primera fase.
 - **Mapa** con Leaflet y **5 estilos** a elegir (Callejero, Minimalista,
   Relieve, Satélite y OSM clásico); la elección se recuerda. Al abrir intenta
   centrarse en la ubicación del usuario; si no, muestra la vista configurada.
-- **Puntos de interés** por categorías, con marcador de color y emoji.
+- **Puntos de interés** por categorías, con marcador de color y emoji. Se
+  añaden manteniendo pulsado el mapa en cualquier sitio —también donde no hay
+  nada catalogado: la casa de alguien, dónde has aparcado— o con «+ Añadir».
 - **Categorías propias**: cada usuario puede crear, editar y borrar las suyas
   (nombre, emoji y color). Son privadas de su cuenta y se suman a las de serie;
   al borrar una, sus puntos pasan a «Otro».

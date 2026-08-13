@@ -356,6 +356,21 @@ select.field-input { cursor: pointer; }
 .leaflet-container { font-family: var(--sans); }
 .app.adding #map { cursor: crosshair; }
 
+/* Señal mientras se mantiene pulsado el mapa */
+.press-ring {
+  position: absolute; z-index: 420; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+  border-radius: 50%; border: 2px solid var(--accent); background: var(--accent-weak);
+  pointer-events: none; animation: crece-anillo 0.55s ease-out forwards;
+}
+@keyframes crece-anillo {
+  from { transform: scale(0.4); opacity: 0.9; }
+  to   { transform: scale(3.4); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .press-ring { animation: none; opacity: .6; } }
+
+/* Sin menú del sistema ni selección al mantener pulsado */
+#map { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+
 .map-hint {
   position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
   background: var(--negro); color: var(--blanco);

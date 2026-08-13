@@ -230,6 +230,7 @@
     map.on("click", function (e) {
       if (addMode) { openEditor(null, e.latlng.lat, e.latlng.lng); setAddMode(false); }
     });
+    activarPulsacionLarga();
     map.on("moveend", function () {
       if (viewMode === "all") scheduleDiscover();
       // Sin ubicación propia la referencia es el centro del mapa: al moverlo
@@ -244,6 +245,57 @@
         renderList();   // ya se pueden mostrar distancias
       }, function () {}, { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 });
     }
+  }
+
+  // --- Mantener pulsado en el mapa para crear un punto ----------------------
+  // Sirve para los sitios que no existen en ningún listado: la casa de alguien,
+  // dónde has aparcado, un rincón sin nombre. Es el gesto de Google Maps, así
+  // que no hay que explicarlo.
+  var PULSACION_MS = 550;
+
+  function activarPulsacionLarga() {
+    var cont = map.getContainer();
+    var temporizador = null, x0 = 0, y0 = 0, anillo = null;
+
+    function cancelar() {
+      clearTimeout(temporizador);
+      temporizador = null;
+      if (anillo) { anillo.remove(); anillo = null; }
+    }
+
+    cont.addEventListener("pointerdown", function (e) {
+      if (addMode) return;                       // en modo añadir basta con tocar
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      // Ni sobre chinchetas, ni globos, ni los controles del mapa.
+      if (e.target.closest && e.target.closest(
+          ".leaflet-marker-icon, .leaflet-popup, .leaflet-control, .map-styles, .map-empty")) return;
+
+      x0 = e.clientX; y0 = e.clientY;
+      var caja = cont.getBoundingClientRect();
+
+      anillo = el("div", "press-ring");
+      anillo.style.left = (x0 - caja.left) + "px";
+      anillo.style.top = (y0 - caja.top) + "px";
+      cont.appendChild(anillo);
+
+      temporizador = setTimeout(function () {
+        var ll = map.containerPointToLatLng([x0 - caja.left, y0 - caja.top]);
+        cancelar();
+        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
+        openEditor(null, ll.lat, ll.lng);
+      }, PULSACION_MS);
+    });
+
+    // Si el dedo se desplaza es que está moviendo el mapa, no marcando un sitio.
+    cont.addEventListener("pointermove", function (e) {
+      if (!temporizador) return;
+      if (Math.abs(e.clientX - x0) > 10 || Math.abs(e.clientY - y0) > 10) cancelar();
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) {
+      cont.addEventListener(ev, cancelar);
+    });
+    // Evita el menú del sistema al mantener pulsado.
+    cont.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
 
   // --- Conjunto activo ----------------------------------------------------
@@ -358,7 +410,7 @@
     if (activeSet().length === 0) {
       if (viewMode === "mine") {
         ul.appendChild(emptyState("Aún no tienes puntos.",
-          "Pulsa “Añadir” y toca el mapa, o usa el modo “Todos” para descubrir sitios."));
+          "Mantén pulsado el mapa para guardar un sitio, o usa el modo “Todos” para descubrirlos."));
       } else {
         ul.appendChild(emptyState("Sin sitios en esta zona.",
           "Acércate o mueve el mapa para buscar en otra zona."));
@@ -1639,7 +1691,8 @@
     box.innerHTML = "";
     box.appendChild(el("div", "map-empty-title", "Aún no tienes puntos guardados"));
     box.appendChild(el("div", "map-empty-sub",
-      "Pulsa “+ Añadir” y toca el mapa para guardar un sitio con tu valoración y tus notas."));
+      "Mantén pulsado el mapa donde quieras —o usa “+ Añadir”— para guardar un sitio " +
+      "con tu valoración y tus notas."));
     if (DISCOVER.enabled) {
       var b = el("button", "btn btn--solid map-empty-btn", "Descubrir sitios de la zona");
       b.type = "button";
