@@ -1905,12 +1905,13 @@
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
-        if (!$("#filters-sheet").hidden) cerrarFiltros();
-        else if (!$("#stats-modal").hidden) cerrarResumen();
-        else if (!$("#privacy-modal").hidden) cerrarPrivacidad();
-        else if (!$("#lists-modal").hidden) cerrarListas();
-        else if (!$("#account-modal").hidden) cerrarCuenta();
+        // En el mismo orden que las capas: se cierra siempre lo de más arriba.
+        if (!$("#privacy-modal").hidden) cerrarPrivacidad();
         else if (!$("#cats-modal").hidden) cerrarCategorias();
+        else if (!$("#lists-modal").hidden) cerrarListas();
+        else if (!$("#filters-sheet").hidden) cerrarFiltros();
+        else if (!$("#stats-modal").hidden) cerrarResumen();
+        else if (!$("#account-modal").hidden) cerrarCuenta();
         else if (!$("#editor").hidden) closeEditor();
         else if (addMode) setAddMode(false);
       }

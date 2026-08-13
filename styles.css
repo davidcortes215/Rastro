@@ -38,6 +38,27 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 
+/* --------------------------------------------------------------------------
+   ORDEN DE CAPAS (z-index) — mantener esta lista al añadir superposiciones.
+   Regla: lo que se abre DESDE otra cosa tiene que ir por encima de ella.
+
+     500   barra superior
+    1100   fondo del panel (móvil)
+    1200   panel lateral
+    1300   fondo del editor de punto
+    1350   editor de punto
+    1400   fondo de cuenta y resumen
+    1450   cuenta y resumen
+    1500   fondo de la hoja de filtros
+    1550   hoja de filtros
+    1600   fondo de categorías y listas   ← se abren desde la hoja de filtros
+    1650   categorías y listas              y desde el editor de punto
+    2000   pantalla de acceso
+    2100   fondo de privacidad            ← se consulta desde el acceso
+    2150   privacidad
+    2200   avisos emergentes
+   -------------------------------------------------------------------------- */
+
 html, body { height: 100%; overflow: hidden; }
 body {
   font-family: var(--sans);
@@ -532,8 +553,8 @@ select.field-input { cursor: pointer; }
 
 /* Diálogo de categorías: por encima del editor de puntos, para poder crear
    una categoría sin cerrar el punto que se está registrando. */
-#cats-backdrop { z-index: 1400; }
-#cats-modal { z-index: 1450; }
+#cats-backdrop { z-index: 1600; }
+#cats-modal { z-index: 1650; }
 #account-backdrop { z-index: 1400; }
 #account-modal { z-index: 1450; }
 /* Privacidad se consulta también desde la pantalla de acceso (z-index 2000),
@@ -647,8 +668,8 @@ select.field-input { cursor: pointer; }
 .editor--wide { width: min(560px, calc(100vw - 2rem)); }
 #stats-backdrop { z-index: 1400; }
 #stats-modal { z-index: 1450; }
-#lists-backdrop { z-index: 1400; }
-#lists-modal { z-index: 1450; }
+#lists-backdrop { z-index: 1600; }
+#lists-modal { z-index: 1650; }
 
 .stats-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;
