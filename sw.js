@@ -9,7 +9,7 @@
    Las peticiones a otros dominios (teselas del mapa, Supabase, Overpass) no
    se interceptan: se dejan pasar tal cual.
    ========================================================================== */
-var CACHE = "rastro-v3";
+var CACHE = "rastro-v4";
 var CORE = [
   "./",
   "./index.html",

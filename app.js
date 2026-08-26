@@ -125,6 +125,26 @@
   }
 
   // --- Iconos -------------------------------------------------------------
+  // Trazos sueltos para los botones del globo: se leen a cualquier tamaño y
+  // heredan el color del botón, así que no hay que duplicarlos por variante.
+  function svg(d, extra) {
+    return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" ' +
+      'stroke-linejoin="round" aria-hidden="true">' + d + (extra || "") + "</svg>";
+  }
+  // Pastilla con el color de la categoría: identifica el sitio antes de leer.
+  function chipCat(c) {
+    return '<span class="popup-chip" style="background:' + c.color + '1F;' +
+           'box-shadow:inset 0 0 0 1px ' + c.color + '3D">' +
+           '<span class="popup-chip-emoji">' + c.emoji + "</span></span>";
+  }
+  var ICO = {
+    ruta:    svg('<path d="M3.4 11.2 20.5 3.5 12.8 20.6l-1.9-7.5-7.5-1.9z"/>'),
+    guardar: svg('<path d="M12 5v14M5 12h14"/>'),
+    editar:  svg('<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l4 4"/>'),
+    borrar:  svg('<path d="M4 7h16M10 4h4M9.5 7.5l.7 12M14.5 7.5l-.7 12"/><path d="M6.2 7l.9 13.2h9.8L17.8 7"/>')
+  };
+
   function makeIcon(p) { // pin (tus puntos)
     var c = cat(p.cat);
     var pending = p.status === "pendiente" ? " is-pending" : "";
@@ -223,6 +243,10 @@
   function initMap() {
     var m = CFG.map;
     map = L.map("map", { zoomControl: true }).setView(m.center, m.zoom);
+    if (map.attributionControl && map.attributionControl.setPrefix) {
+      map.attributionControl.setPrefix(
+        '<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
+    }
     buildStyleControl();
     applyMapStyle(savedStyleId() || m.defaultStyle || mapStyles()[0].id);
     markersLayer = L.layerGroup().addTo(map);
@@ -355,34 +379,49 @@
   }
   function popupHtml(p) {
     var c = cat(p.cat);
+    var chip = chipCat(c);
+
     if (p.osm) {
       return '<div class="popup" data-id="' + p.id + '">' +
-        '<div class="popup-name">' + escapeHtml(p.name) + "</div>" +
-        '<div class="popup-meta">' + escapeHtml(c.label) + " · OpenStreetMap</div>" +
+        '<div class="popup-head">' + chip +
+          '<div class="popup-titles">' +
+            '<h3 class="popup-name">' + escapeHtml(p.name) + "</h3>" +
+            '<p class="popup-meta">' + escapeHtml(c.label) +
+              '<span class="popup-src">OpenStreetMap</span></p>' +
+          "</div></div>" +
         '<div class="popup-actions">' +
-          '<button type="button" data-act="save">＋ Guardar</button>' +
-          '<button type="button" data-act="ir">Cómo llegar</button>' +
+          '<button type="button" class="pbtn pbtn--primary" data-act="save">' +
+            ICO.guardar + "Guardar</button>" +
+          '<button type="button" class="pbtn" data-act="ir">' + ICO.ruta + "Cómo llegar</button>" +
         "</div></div>";
     }
-    var meta = c.label + (p.status === "pendiente" ? " · " + statusLabel("pendiente").toLowerCase() : "");
-    var stars = (p.status === "pendiente" && !p.stars) ? "" :
-      '<span class="popup-stars">' + starsText(p.stars) + "</span> ";
-    var notes = p.notes ? '<div class="popup-notes">' + escapeHtml(p.notes) + "</div>" : "";
+
+    var pendiente = p.status === "pendiente";
+    var estrellas = (pendiente && !p.stars) ? "" :
+      '<span class="popup-stars" aria-label="' + p.stars + ' de 5">' + starsText(p.stars) + "</span>";
+    var estado = pendiente ? '<span class="popup-pend">' + escapeHtml(statusLabel("pendiente")) + "</span>" : "";
+    var notes = p.notes ? '<p class="popup-notes">' + escapeHtml(p.notes) + "</p>" : "";
     var fotos = "";
     if (p.photos && p.photos.length) {
       fotos = '<div class="popup-photos">' + p.photos.map(function (ph) {
         return '<img src="' + escapeHtml(ph.url) + '" alt="" loading="lazy">';
       }).join("") + "</div>";
     }
+
     return '<div class="popup" data-id="' + p.id + '">' +
-      '<div class="popup-name">' + escapeHtml(p.name) + "</div>" +
-      '<div class="popup-meta">' + stars + escapeHtml(meta) + "</div>" +
-      fotos +
-      notes +
+      '<div class="popup-head">' + chip +
+        '<div class="popup-titles">' +
+          '<h3 class="popup-name">' + escapeHtml(p.name) + "</h3>" +
+          '<p class="popup-meta">' + estrellas + escapeHtml(c.label) + estado + "</p>" +
+        "</div></div>" +
+      fotos + notes +
       '<div class="popup-actions">' +
-        '<button type="button" data-act="ir">Cómo llegar</button>' +
-        '<button type="button" data-act="edit">Editar</button>' +
-        '<button type="button" data-act="delete">Eliminar</button>' +
+        '<button type="button" class="pbtn pbtn--primary" data-act="ir">' +
+          ICO.ruta + "Cómo llegar</button>" +
+        '<button type="button" class="pbtn pbtn--icon" data-act="edit" ' +
+          'title="Editar" aria-label="Editar">' + ICO.editar + "</button>" +
+        '<button type="button" class="pbtn pbtn--icon pbtn--danger" data-act="delete" ' +
+          'title="Eliminar" aria-label="Eliminar">' + ICO.borrar + "</button>" +
       "</div></div>";
   }
   function wirePopup(id) {
@@ -433,7 +472,11 @@
       // El contenido va en una capa que se desplaza al deslizar, dejando a la
       // vista las acciones que hay detrás.
       var top = el("div", "poi-card-top");
-      var icon = el("span", "poi-card-icon"); icon.style.background = c.color; icon.textContent = c.emoji;
+      // Misma pastilla que en el globo del mapa: el color identifica sin gritar.
+      var icon = el("span", "poi-card-icon");
+      icon.style.background = c.color + "1F";
+      icon.style.boxShadow = "inset 0 0 0 1px " + c.color + "3D";
+      icon.textContent = c.emoji;
       top.appendChild(icon);
       top.appendChild(el("span", "poi-card-name", p.name));
       if (p.photos && p.photos.length) {
@@ -1887,15 +1930,23 @@
       })
     }).addTo(map);
 
+    var cb = cat(item.cat);
     searchMarker.bindPopup(
       '<div class="popup popup-search">' +
-        '<div class="popup-name">' + escapeHtml(nombre) + "</div>" +
-        '<div class="popup-meta">' + escapeHtml(cat(item.cat).label) + " · resultado de búsqueda</div>" +
+        '<div class="popup-head">' +
+          chipCat(cb) +
+          '<div class="popup-titles">' +
+            '<h3 class="popup-name">' + escapeHtml(nombre) + "</h3>" +
+            '<p class="popup-meta">' + escapeHtml(cb.label) +
+              '<span class="popup-src">búsqueda</span></p>' +
+          "</div></div>" +
         '<div class="popup-actions">' +
-          '<button type="button" data-act="save">＋ Guardar</button>' +
-          '<button type="button" data-act="ir">Cómo llegar</button>' +
-          '<button type="button" data-act="close">Quitar</button>' +
-        "</div></div>");
+          '<button type="button" class="pbtn pbtn--primary" data-act="save">' +
+            ICO.guardar + "Guardar</button>" +
+          '<button type="button" class="pbtn" data-act="ir">' + ICO.ruta + "Cómo llegar</button>" +
+        "</div>" +
+        '<button type="button" class="popup-quitar" data-act="close">Quitar del mapa</button>' +
+      "</div>");
 
     searchMarker.on("popupopen", function () {
       var nodo = document.querySelector('.popup-search');
