@@ -177,6 +177,12 @@
   }
 
   // --- Mapa ---------------------------------------------------------------
+  // Mercator no llega a los polos: ±85.06° es todo el mundo que se dibuja.
+  // Fuera de este rectángulo Leaflet repetiría el planeta a los lados, y las
+  // chinchetas solo aparecen en la copia original: verías dos Españas y una
+  // de ellas vacía.
+  var MUNDO = [[-85.06, -180], [85.06, 180]];
+
   function mapStyles() {
     if (CFG.map.styles && CFG.map.styles.length) return CFG.map.styles;
     // Compatibilidad con configuraciones antiguas que solo tenían "tiles".
@@ -197,7 +203,9 @@
       maxZoom: st.maxZoom || 19,
       subdomains: st.subdomains || "abc",
       detectRetina: !!st.retina,
-      attribution: st.attribution || ""
+      attribution: st.attribution || "",
+      noWrap: true,                 // ni teselas ni mundos duplicados
+      bounds: MUNDO
     }).addTo(map);
     if (tileLayer.bringToBack) tileLayer.bringToBack();
     if (map.setMaxZoom) map.setMaxZoom(st.maxZoom || 19);
@@ -240,13 +248,37 @@
     });
   }
 
+  // Sin mundos repetidos, alejarse de más dejaría franjas vacías alrededor.
+  // El tope es el primer nivel en el que el mapa cubre la pantalla entera:
+  // el mundo mide 256·2^z píxeles de lado, así que basta con que ese lado
+  // llegue al lado mayor del contenedor.
+  function zoomQueLlenaLaPantalla() {
+    var s = map && map.getSize ? map.getSize() : null;
+    if (!s || !s.x || !s.y) return 2;
+    var lado = Math.max(s.x, s.y);
+    return Math.max(0, Math.ceil(Math.log(lado / 256) / Math.LN2));
+  }
+  function ajustarZoomMinimo() {
+    if (!map || !map.setMinZoom) return;
+    var z = zoomQueLlenaLaPantalla();
+    if (map.getMinZoom && map.getMinZoom() === z) return;
+    map.setMinZoom(z);      // si el zoom actual se queda corto, Leaflet acerca
+  }
+
   function initMap() {
     var m = CFG.map;
-    map = L.map("map", { zoomControl: true }).setView(m.center, m.zoom);
+    map = L.map("map", {
+      zoomControl: true,
+      worldCopyJump: false,
+      maxBounds: MUNDO,
+      maxBoundsViscosity: 1
+    }).setView(m.center, m.zoom);
     if (map.attributionControl && map.attributionControl.setPrefix) {
       map.attributionControl.setPrefix(
         '<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
     }
+    ajustarZoomMinimo();
+    map.on("resize", ajustarZoomMinimo);   // girar el móvil, abrir el panel…
     buildStyleControl();
     applyMapStyle(savedStyleId() || m.defaultStyle || mapStyles()[0].id);
     markersLayer = L.layerGroup().addTo(map);
@@ -998,8 +1030,11 @@
     // Se pide un área mayor que la visible para que los desplazamientos
     // pequeños queden cubiertos por la caché.
     var area = view.pad(DISCOVER.padding == null ? 0.35 : DISCOVER.padding);
-    var bbox = area.getSouth().toFixed(5) + "," + area.getWest().toFixed(5) + "," +
-               area.getNorth().toFixed(5) + "," + area.getEast().toFixed(5);
+    // El margen puede sacar el rectángulo del mundo; Overpass rechaza esas
+    // coordenadas, así que se recortan.
+    function tope(v, lim) { return Math.max(-lim, Math.min(lim, v)).toFixed(5); }
+    var bbox = tope(area.getSouth(), 85.06) + "," + tope(area.getWest(), 180) + "," +
+               tope(area.getNorth(), 85.06) + "," + tope(area.getEast(), 180);
     var timeout = DISCOVER.queryTimeout || 25;
     var query = "[out:json][timeout:" + timeout + "];(";
     selectors.forEach(function (sel) { query += "nwr" + sel + "(" + bbox + ");"; });
