@@ -200,6 +200,9 @@
     if (tileLayer) map.removeLayer(tileLayer);
     tileLayer = L.tileLayer(st.url, {
       maxZoom: st.maxZoom || 19,
+      // Hasta dónde tiene teselas de verdad el servicio. Más allá, Leaflet
+      // reescala las últimas: se ve borroso, pero nunca en blanco.
+      maxNativeZoom: st.maxNativeZoom || st.maxZoom || 19,
       subdomains: st.subdomains || "abc",
       detectRetina: !!st.retina,
       attribution: st.attribution || ""

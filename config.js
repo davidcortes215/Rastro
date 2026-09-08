@@ -59,17 +59,25 @@ window.APP_CONFIG = {
        que conservar su atribución. Para quitar alguno, bórralo de la lista. */
     defaultStyle: "voyager",
     styles: [
+      /* Estos dos estilos eran de CARTO, que desde 2025 exige una clave de API:
+         sin ella estampa "API KEY REQUIRED" sobre cada tesela. Se sirven ahora
+         desde Esri, el mismo proveedor que las imágenes de satélite, que no
+         pide clave. Si algún día quieres recuperar el aspecto de CARTO, hay
+         plan gratuito: se registra la clave y se añade "?api_key=..." al final
+         de la URL. */
       {
-        id: "voyager", label: "Callejero",
-        url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        subdomains: "abcd", maxZoom: 20, retina: true,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        id: "callejero", label: "Callejero",
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+        maxZoom: 19,
+        attribution: 'Cartografía &copy; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       },
       {
         id: "minimal", label: "Minimalista",
-        url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-        subdomains: "abcd", maxZoom: 20, retina: true,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        // El servicio solo tiene teselas hasta el nivel 16; de ahí en adelante
+        // Leaflet reescala las últimas en vez de dejar el mapa en blanco.
+        maxZoom: 19, maxNativeZoom: 16,
+        attribution: 'Cartografía &copy; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       },
       {
         id: "relieve", label: "Relieve",
