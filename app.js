@@ -177,11 +177,10 @@
   }
 
   // --- Mapa ---------------------------------------------------------------
-  // Mercator no llega a los polos: ±85.06° es todo el mundo que se dibuja.
-  // Fuera de este rectángulo Leaflet repetiría el planeta a los lados, y las
-  // chinchetas solo aparecen en la copia original: verías dos Españas y una
-  // de ellas vacía.
-  var MUNDO = [[-85.06, -180], [85.06, 180]];
+  // Límites del mundo dibujable: Mercator no llega a los polos, y la longitud
+  // da la vuelta en ±180°. Se usan para recortar lo que se le pide a Overpass;
+  // el mapa en sí no está encerrado aquí, se puede dar la vuelta al planeta.
+  var LAT_MAX = 85.06, LNG_MAX = 180;
 
   function mapStyles() {
     if (CFG.map.styles && CFG.map.styles.length) return CFG.map.styles;
@@ -203,9 +202,7 @@
       maxZoom: st.maxZoom || 19,
       subdomains: st.subdomains || "abc",
       detectRetina: !!st.retina,
-      attribution: st.attribution || "",
-      noWrap: true,                 // ni teselas ni mundos duplicados
-      bounds: MUNDO
+      attribution: st.attribution || ""
     }).addTo(map);
     if (tileLayer.bringToBack) tileLayer.bringToBack();
     if (map.setMaxZoom) map.setMaxZoom(st.maxZoom || 19);
@@ -248,10 +245,11 @@
     });
   }
 
-  // Sin mundos repetidos, alejarse de más dejaría franjas vacías alrededor.
-  // El tope es el primer nivel en el que el mapa cubre la pantalla entera:
-  // el mundo mide 256·2^z píxeles de lado, así que basta con que ese lado
-  // llegue al lado mayor del contenedor.
+  // Alejarse hasta que el mundo mida menos que la pantalla es lo que hacía
+  // aparecer dos Españas a la vez, una sin chinchetas. Mientras el mapa sea
+  // más ancho que la ventana, cada sitio solo cabe una vez. El tope es, pues,
+  // el primer nivel en el que el mapa la cubre entera: el mundo mide 256·2^z
+  // píxeles de lado, así que ese lado tiene que llegar al mayor del contenedor.
   function zoomQueLlenaLaPantalla() {
     var s = map && map.getSize ? map.getSize() : null;
     if (!s || !s.x || !s.y) return 2;
@@ -267,11 +265,12 @@
 
   function initMap() {
     var m = CFG.map;
+    // worldCopyJump: al pasar al planeta de al lado, el mapa vuelve sin ruido
+    // a la copia original, así que se puede seguir girando indefinidamente y
+    // las chinchetas siguen ahí (solo existen en esa copia).
     map = L.map("map", {
       zoomControl: true,
-      worldCopyJump: false,
-      maxBounds: MUNDO,
-      maxBoundsViscosity: 1
+      worldCopyJump: true
     }).setView(m.center, m.zoom);
     if (map.attributionControl && map.attributionControl.setPrefix) {
       map.attributionControl.setPrefix(
@@ -1008,7 +1007,11 @@
       setDiscoverStatus("Selecciona alguna categoría para buscar.");
       return;
     }
+    // Dando vueltas al mundo la vista puede quedar en la copia +1 o -1, con
+    // longitudes de 400 o de -540. Se devuelve a la copia de referencia para
+    // que la caché reconozca la zona y la consulta pida el sitio correcto.
     var view = map.getBounds();
+    if (map.wrapLatLngBounds) view = map.wrapLatLngBounds(view);
     var sig = selectors.join("|");
     var ttl = (DISCOVER.cacheMinutes || 10) * 60000;
 
@@ -1033,8 +1036,8 @@
     // El margen puede sacar el rectángulo del mundo; Overpass rechaza esas
     // coordenadas, así que se recortan.
     function tope(v, lim) { return Math.max(-lim, Math.min(lim, v)).toFixed(5); }
-    var bbox = tope(area.getSouth(), 85.06) + "," + tope(area.getWest(), 180) + "," +
-               tope(area.getNorth(), 85.06) + "," + tope(area.getEast(), 180);
+    var bbox = tope(area.getSouth(), LAT_MAX) + "," + tope(area.getWest(), LNG_MAX) + "," +
+               tope(area.getNorth(), LAT_MAX) + "," + tope(area.getEast(), LNG_MAX);
     var timeout = DISCOVER.queryTimeout || 25;
     var query = "[out:json][timeout:" + timeout + "];(";
     selectors.forEach(function (sel) { query += "nwr" + sel + "(" + bbox + ");"; });
