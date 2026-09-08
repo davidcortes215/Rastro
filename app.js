@@ -1013,8 +1013,7 @@
     // Dando vueltas al mundo la vista puede quedar en la copia +1 o -1, con
     // longitudes de 400 o de -540. Se devuelve a la copia de referencia para
     // que la caché reconozca la zona y la consulta pida el sitio correcto.
-    var view = map.getBounds();
-    if (map.wrapLatLngBounds) view = map.wrapLatLngBounds(view);
+    var view = bboxVisible();
     var sig = selectors.join("|");
     var ttl = (DISCOVER.cacheMinutes || 10) * 60000;
 
@@ -1038,9 +1037,7 @@
     var area = view.pad(DISCOVER.padding == null ? 0.35 : DISCOVER.padding);
     // El margen puede sacar el rectángulo del mundo; Overpass rechaza esas
     // coordenadas, así que se recortan.
-    function tope(v, lim) { return Math.max(-lim, Math.min(lim, v)).toFixed(5); }
-    var bbox = tope(area.getSouth(), LAT_MAX) + "," + tope(area.getWest(), LNG_MAX) + "," +
-               tope(area.getNorth(), LAT_MAX) + "," + tope(area.getEast(), LNG_MAX);
+    var bbox = bboxTexto(area);
     var timeout = DISCOVER.queryTimeout || 25;
     var query = "[out:json][timeout:" + timeout + "];(";
     selectors.forEach(function (sel) { query += "nwr" + sel + "(" + bbox + ");"; });
@@ -1854,6 +1851,21 @@
 
   // Sin tildes y en minúsculas: quien busca "cafe atlantico" tiene que
   // encontrar el "Café Atlántico".
+  // Deja una coordenada dentro del mundo y con los decimales justos.
+  function acotar(v, lim) { return Math.max(-lim, Math.min(lim, v)).toFixed(5); }
+
+  // El rectángulo que se ve, devuelto a la copia de referencia del mundo y
+  // recortado: sirve tanto para pedir sitios como para buscar por nombre.
+  function bboxVisible() {
+    var v = map.getBounds();
+    if (map.wrapLatLngBounds) v = map.wrapLatLngBounds(v);
+    return v;
+  }
+  function bboxTexto(v) {
+    return acotar(v.getSouth(), LAT_MAX) + "," + acotar(v.getWest(), LNG_MAX) + "," +
+           acotar(v.getNorth(), LAT_MAX) + "," + acotar(v.getEast(), LNG_MAX);
+  }
+
   function sinTildes(t) {
     return String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
@@ -1906,7 +1918,16 @@
 
   function fetchNominatim(q, restrictCountry) {
     var g = CFG.map.geocode;
-    var url = g.endpoint + "?format=jsonv2&limit=8&addressdetails=0" +
+    // viewbox sin "bounded": no limita la búsqueda a lo que se ve, solo hace
+    // que lo cercano suba en la lista. Un negocio pequeño nunca gana a un
+    // pueblo por importancia, pero sí por cercanía.
+    var caja = "";
+    try {
+      var v = bboxVisible();
+      caja = "&viewbox=" + acotar(v.getWest(), LNG_MAX) + "," + acotar(v.getNorth(), LAT_MAX) +
+             "," + acotar(v.getEast(), LNG_MAX) + "," + acotar(v.getSouth(), LAT_MAX);
+    } catch (e) {}
+    var url = g.endpoint + "?format=jsonv2&limit=15&addressdetails=0" + caja +
       (restrictCountry && g.countrycodes ? "&countrycodes=" + encodeURIComponent(g.countrycodes) : "") +
       (g.language ? "&accept-language=" + encodeURIComponent(g.language) : "") +
       "&q=" + encodeURIComponent(q);
@@ -1933,7 +1954,15 @@
   function fetchPhoton(q) {
     var g = CFG.map.geocode;
     var base = g.fallbackEndpoint || "https://photon.komoot.io/api/";
-    var url = base + "?limit=8&q=" + encodeURIComponent(q);
+    // Photon ordena por importancia mundial y no sabe filtrar por país: el
+    // filtro lo hacemos aquí. Con limit=8 bastaba que hubiera ocho sitios más
+    // conocidos fuera de España para quedarnos sin ninguno de dentro, así que
+    // se pide de más. Y se le dice desde dónde se mira, para que lo cercano
+    // suba: eso no descarta nada, solo reordena.
+    var c = null;
+    try { c = map && map.getCenter ? map.getCenter() : null; } catch (e) {}
+    var url = base + "?limit=25&q=" + encodeURIComponent(q) +
+      (c ? "&lat=" + c.lat.toFixed(4) + "&lon=" + c.lng.toFixed(4) : "");
     return fetch(url).then(function (r) {
       if (!r.ok) throw new Error("photon " + r.status);
       return r.json();
@@ -1999,6 +2028,65 @@
     });
   }
 
+  // Tercera vía. Los geocodificadores ordenan por importancia: un taller, una
+  // tienda o un concesionario quedan siempre por debajo de cualquier calle o
+  // pueblo con un nombre parecido, y no llegan a la lista. Preguntando a
+  // OpenStreetMap por lo que hay dentro del mapa, eso deja de competir. A
+  // cambio hay que estar mirando más o menos la zona, así que es una acción
+  // aparte y no algo que pase solo.
+  var zonaSeq = 0;
+  var CLAVES_NEGOCIO = ["shop", "amenity", "office", "craft", "tourism", "leisure", "healthcare"];
+
+  function buscarEnLaZona(q) {
+    var seq = ++zonaSeq;
+    geoSeq++;                       // cancela cualquier búsqueda en vuelo
+    geoLastQuery = q;
+    geoMessage("Buscando “" + q + "” en esta zona…");
+
+    var bbox = bboxTexto(bboxVisible());
+    var texto = String(q).replace(/[\\"^$.*+?()[\]{}|]/g, "\\$&");
+    var query = "[out:json][timeout:" + (DISCOVER.queryTimeout || 25) + "];(";
+    CLAVES_NEGOCIO.forEach(function (k) {
+      query += 'nwr["name"~"' + texto + '",i]["' + k + '"](' + bbox + ");";
+    });
+    query += ");out center 40;";
+
+    var servidores = overpassEndpoints();
+    (function intento(i) {
+      if (seq !== zonaSeq) return;
+      if (i >= servidores.length) {
+        geoMessage("No se pudo buscar en esta zona ahora. Inténtalo en unos segundos.");
+        return;
+      }
+      fetch(servidores[i], {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "data=" + encodeURIComponent(query)
+      }).then(function (r) {
+        if (!r.ok) { var e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+        return r.json();
+      }).then(function (data) {
+        if (seq !== zonaSeq) return;
+        var els = (data && data.elements) || [];
+        var lista = [];
+        els.forEach(function (e) {
+          var lat = e.lat != null ? e.lat : (e.center && e.center.lat);
+          var lon = e.lon != null ? e.lon : (e.center && e.center.lon);
+          var t = e.tags || {};
+          if (lat == null || lon == null || !t.name) return;
+          lista.push({
+            lat: lat, lon: lon, name: t.name, label: t.name,
+            zona: limpiarZona([t["addr:street"], t["addr:city"], t["addr:province"]].filter(Boolean)),
+            fuente: "overpass", cat: osmCategoryOf(t)
+          });
+        });
+        showGeoResults(ordenarPorNombre(lista, q).slice(0, 12), true);
+      }).catch(function () {
+        intento(i + 1);
+      });
+    })(0);
+  }
+
   function geoMessage(msg) {
     var ul = $("#geosearch-results");
     ul.innerHTML = "";
@@ -2007,12 +2095,14 @@
     ul.hidden = false;
   }
 
-  function showGeoResults(list) {
+  function showGeoResults(list, yaEsDeLaZona) {
     var ul = $("#geosearch-results"); ul.innerHTML = "";
     geoItems = list; geoActiveIndex = -1;
+
     if (!list.length) {
-      ul.appendChild(el("li", "empty", "Sin resultados para “" + geoLastQuery + "”"));
-      ul.hidden = false; return;
+      ul.appendChild(el("li", "empty", yaEsDeLaZona
+        ? "Nada con ese nombre en la zona que se ve. Prueba a alejar o mover el mapa."
+        : "Sin resultados para “" + geoLastQuery + "”"));
     }
     list.forEach(function (item, i) {
       var li = el("li");
@@ -2022,6 +2112,16 @@
       li.addEventListener("click", function () { pickGeo(i); });
       ul.appendChild(li);
     });
+
+    // Con pocos resultados casi siempre falta un negocio pequeño, que es justo
+    // lo que los buscadores de direcciones no saben encontrar.
+    if (!yaEsDeLaZona && list.length < 5 && geoLastQuery) {
+      var mas = el("li", "geo-more");
+      mas.appendChild(el("span", "geo-name", "Buscar negocios en esta zona"));
+      mas.appendChild(el("span", "geo-zona", "Dentro de lo que se ve en el mapa"));
+      mas.addEventListener("click", function () { buscarEnLaZona(geoLastQuery); });
+      ul.appendChild(mas);
+    }
     ul.hidden = false;
   }
 
@@ -2230,13 +2330,18 @@
           return;
         }
         if (ul.hidden) return;
-        var items = ul.querySelectorAll("li:not(.empty)");
+        var items = ul.querySelectorAll("li:not(.empty):not(.geo-more)");
         if (e.key === "ArrowDown") { e.preventDefault(); geoActiveIndex = Math.min(geoActiveIndex + 1, items.length - 1); }
         else if (e.key === "ArrowUp") { e.preventDefault(); geoActiveIndex = Math.max(geoActiveIndex - 1, 0); }
         else { return; }
         items.forEach(function (li, i) { li.classList.toggle("active", i === geoActiveIndex); });
       });
       document.addEventListener("click", function (e) {
+        // Pulsar "buscar negocios en esta zona" rehace la lista en el acto, así
+        // que cuando este manejador se entera, aquello sobre lo que se pulsó ya
+        // no está en la página. No es un clic de fuera: es un clic de dentro
+        // cuyo destino ha desaparecido.
+        if (!document.contains(e.target)) return;
         if (!$("#geosearch").contains(e.target)) $("#geosearch-results").hidden = true;
       });
       $("#geosearch").addEventListener("submit", function (e) { e.preventDefault(); });

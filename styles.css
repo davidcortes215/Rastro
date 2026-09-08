@@ -152,6 +152,11 @@ input, select, textarea { font-family: inherit; }
 .geosearch-results li:last-child { border-bottom: none; }
 .geosearch-results li:hover, .geosearch-results li.active { background: var(--accent-weak); }
 .geosearch-results li.empty { color: var(--ink-faint); cursor: default; }
+/* Buscar en la zona: es una acción, no un sitio. Se separa del listado. */
+.geosearch-results li.geo-more { background: var(--surface-2); border-top: 1px solid var(--line-strong); border-bottom: none; }
+.geosearch-results li.geo-more .geo-name { color: var(--accent); }
+.geosearch-results li.geo-more .geo-zona { white-space: normal; }
+.geosearch-results li.geo-more:hover { background: var(--accent-weak); }
 
 .topbar-actions { display: flex; align-items: center; gap: 0.4rem; flex: 0 0 auto; }
 
