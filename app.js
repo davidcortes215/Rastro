@@ -1852,6 +1852,58 @@
   // proveedor de respaldo (Photon) cuando el principal falla o no encuentra.
   var geoTimer, geoActiveIndex = -1, geoItems = [], geoSeq = 0, geoLastQuery = "";
 
+  // Sin tildes y en minúsculas: quien busca "cafe atlantico" tiene que
+  // encontrar el "Café Atlántico".
+  function sinTildes(t) {
+    return String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  // De "Mercadona, Calle Real, Cariño, A Coruña, 15360, España" queda
+  // "Calle Real, Cariño, A Coruña": dónde está, sin repetir el nombre ni
+  // arrastrar el código postal y el país.
+  function zonaDe(displayName, nombre) {
+    var partes = String(displayName || "").split(",").map(function (t) { return t.trim(); });
+    if (partes.length && sinTildes(partes[0]) === sinTildes(nombre)) partes.shift();
+    return limpiarZona(partes);
+  }
+  // Fuera el código postal y el país de casa: se da por sabido. El de fuera sí
+  // se queda, que es justo lo que distingue un resultado del otro lado
+  // de la frontera.
+  function limpiarZona(partes) {
+    return partes.filter(function (t) {
+      return t && !/^\d{4,5}$/.test(t) && sinTildes(t) !== "espana";
+    }).slice(0, 3).join(", ");
+  }
+
+  // Los dos buscadores devuelven el mismo sitio a menudo. Se considera
+  // repetido si coincide el nombre y están a menos de 250 m: la misma tienda
+  // vista por dos servicios, no dos sucursales de la misma cadena.
+  function unirResultados(a, b) {
+    var out = a.slice();
+    b.forEach(function (n) {
+      var repe = out.some(function (v) {
+        return sinTildes(v.name) === sinTildes(n.name) &&
+               distanciaM(v.lat, v.lon, n.lat, n.lon) < 250;
+      });
+      if (!repe) out.push(n);
+    });
+    return out;
+  }
+
+  // Buscando una empresa, lo que se ha escrito es su nombre: primero lo que
+  // empieza igual, después lo que lo contiene, y al final las calles y
+  // pueblos que el geocodificador ha colado por parecido.
+  function ordenarPorNombre(list, q) {
+    var t = sinTildes(q);
+    return list.map(function (it, i) {
+      var n = sinTildes(it.name);
+      var pos = n.indexOf(t);
+      return { it: it, rango: pos === 0 ? 0 : (pos > 0 ? 1 : 2), i: i };
+    }).sort(function (x, y) {
+      return x.rango - y.rango || x.i - y.i;
+    }).map(function (x) { return x.it; });
+  }
+
   function fetchNominatim(q, restrictCountry) {
     var g = CFG.map.geocode;
     var url = g.endpoint + "?format=jsonv2&limit=8&addressdetails=0" +
@@ -1865,10 +1917,13 @@
       return (list || []).map(function (x) {
         var etiquetas = {};
         if (x.category && x.type) etiquetas[x.category] = x.type;
+        var nombre = x.name || String(x.display_name || "").split(",")[0].trim();
         return {
           lat: parseFloat(x.lat), lon: parseFloat(x.lon),
           label: x.display_name,
-          name: x.name || String(x.display_name || "").split(",")[0].trim(),
+          name: nombre,
+          zona: zonaDe(x.display_name, nombre),
+          fuente: "nominatim",
           cat: osmCategoryOf(etiquetas)
         };
       });
@@ -1895,37 +1950,53 @@
         var parts = [p.name, p.city || p.county, p.state, p.country].filter(Boolean);
         var etiquetas = {};
         if (p.osm_key && p.osm_value) etiquetas[p.osm_key] = p.osm_value;
+        var sitio = [p.street, p.city || p.county, p.state, p.country].filter(Boolean);
         return {
           lat: f.geometry.coordinates[1],
           lon: f.geometry.coordinates[0],
           label: parts.join(", "),
           name: p.name || parts[0] || "",
+          zona: limpiarZona(sitio),
+          fuente: "photon",
           cat: osmCategoryOf(etiquetas)
         };
       });
     });
   }
 
+  // Se pregunta a los dos servicios a la vez y se juntan las respuestas.
+  // Antes Photon solo entraba si Nominatim no devolvía nada, y ahí estaba el
+  // problema para buscar empresas: Nominatim casi siempre devuelve algo (una
+  // calle, un pueblo que se parece), así que Photon —que es el que sabe
+  // buscar por nombre— no llegaba a preguntarse nunca.
   function geosearch(q) {
     var seq = ++geoSeq;
     geoLastQuery = q;
     geoMessage("Buscando…");
-    fetchNominatim(q, true)
-      .then(function (list) {
-        if (list.length) return list;
-        return fetchPhoton(q); // no encontró: probamos el de respaldo
-      })
-      .catch(function () {
-        return fetchPhoton(q); // falló (p. ej. límite de uso): respaldo
-      })
-      .then(function (list) {
-        if (seq !== geoSeq) return; // respuesta antigua
-        showGeoResults(list || []);
-      })
-      .catch(function () {
-        if (seq !== geoSeq) return;
+
+    var falloN = false, falloP = false;
+    Promise.all([
+      fetchNominatim(q, true).catch(function () { falloN = true; return []; }),
+      fetchPhoton(q).catch(function () { falloP = true; return []; })
+    ]).then(function (res) {
+      if (seq !== geoSeq) return;                    // respuesta antigua
+      if (falloN && falloP) {
         geoMessage("No se pudo buscar ahora. Inténtalo en unos segundos.");
-      });
+        return;
+      }
+      var lista = unirResultados(res[0], res[1]);
+      if (lista.length) {
+        showGeoResults(ordenarPorNombre(lista, q).slice(0, 10));
+        return;
+      }
+      // Nada en el país configurado. Puede estar al otro lado de la frontera,
+      // así que se repite sin esa restricción antes de darse por vencido.
+      fetchNominatim(q, false).catch(function () { return []; })
+        .then(function (fuera) {
+          if (seq !== geoSeq) return;
+          showGeoResults(ordenarPorNombre(fuera, q).slice(0, 10));
+        });
+    });
   }
 
   function geoMessage(msg) {
@@ -1944,7 +2015,10 @@
       ul.hidden = false; return;
     }
     list.forEach(function (item, i) {
-      var li = el("li", null, item.label);
+      var li = el("li");
+      li.appendChild(el("span", "geo-name", item.name || item.label));
+      var zona = item.zona || "";
+      if (zona) li.appendChild(el("span", "geo-zona", zona));
       li.addEventListener("click", function () { pickGeo(i); });
       ul.appendChild(li);
     });

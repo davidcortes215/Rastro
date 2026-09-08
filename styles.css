@@ -141,7 +141,14 @@ input, select, textarea { font-family: inherit; }
   overflow: hidden; max-height: 320px; overflow-y: auto; z-index: 600;
   border: 1px solid var(--line);
 }
-.geosearch-results li { padding: 0.6rem 0.85rem; font-size: 0.85rem; border-bottom: 1px solid var(--line); cursor: pointer; }
+.geosearch-results li { padding: 0.55rem 0.85rem; font-size: 0.85rem; border-bottom: 1px solid var(--line); cursor: pointer; }
+/* El nombre manda; debajo, en pequeño, dónde está: buscando una empresa
+   suele haber varias con el mismo nombre y lo que distingue es el pueblo. */
+.geo-name { display: block; font-weight: 600; color: var(--ink); }
+.geo-zona {
+  display: block; margin-top: 0.1rem; font-size: 0.76rem; color: var(--ink-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .geosearch-results li:last-child { border-bottom: none; }
 .geosearch-results li:hover, .geosearch-results li.active { background: var(--accent-weak); }
 .geosearch-results li.empty { color: var(--ink-faint); cursor: default; }
